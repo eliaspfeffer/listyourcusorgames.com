@@ -1,0 +1,32 @@
+{
+  "name": "listyouraigames",
+  "version": "1.0.0",
+  "description": "Eine Retro-Style-Website zum Auflisten von KI-generierten Minispielen",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "seed": "node seed.js"
+  },
+  "keywords": [
+    "ai",
+    "games",
+    "retro",
+    "miniclip",
+    "spieleaffe"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "ejs": "^3.1.9",
+    "express-ejs-layouts": "^2.5.1",
+    "mongoose": "^7.5.0",
+    "dotenv": "^16.3.1",
+    "method-override": "^3.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

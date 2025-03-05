@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ListYourAIGames.com - Deine Retro-Spielesammlung</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="/images/favicon.png" />
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <h1 class="logo"><a href="/">ListYourAIGames.com</a></h1>
+        <nav>
+          <ul>
+            <li><a href="/" class="nav-link">Startseite</a></li>
+            <li><a href="/games/new" class="nav-link">Spiel hinzufügen</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container"><%- body %></main>
+
+    <footer>
+      <div class="container">
+        <p>
+          &copy; <%= new Date().getFullYear() %> ListYourAIGames.com - Die
+          Retro-Spielesammlung für KI-generierte Minispiele
+        </p>
+      </div>
+    </footer>
+
+    <script src="/js/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,48 @@
+<div class="form-container">
+  <h2>Füge dein KI-generiertes Spiel hinzu</h2>
+  <p>Teile dein Spiel mit der Community - keine Anmeldung erforderlich!</p>
+
+  <form action="/games" method="POST" class="game-form">
+    <div class="form-group">
+      <label for="title">Spieltitel *</label>
+      <input type="text" id="title" name="title" required />
+    </div>
+
+    <div class="form-group">
+      <label for="description">Beschreibung *</label>
+      <textarea
+        id="description"
+        name="description"
+        rows="4"
+        required
+      ></textarea>
+      <small
+        >Beschreibe kurz, worum es in deinem Spiel geht (max. 200
+        Zeichen)</small
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="gameUrl">Spiel-URL *</label>
+      <input type="url" id="gameUrl" name="gameUrl" required />
+      <small>Link zur Webseite, auf der dein Spiel gespielt werden kann</small>
+    </div>
+
+    <div class="form-group">
+      <label for="imageUrl">Bild-URL *</label>
+      <input type="url" id="imageUrl" name="imageUrl" required />
+      <small>Link zu einem Screenshot oder Vorschaubild deines Spiels</small>
+    </div>
+
+    <div class="form-group">
+      <label for="xProfile">X (Twitter) Profil</label>
+      <input type="text" id="xProfile" name="xProfile" />
+      <small>Dein X-Profil (optional, z.B. @username)</small>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Spiel hinzufügen</button>
+      <a href="/" class="btn btn-secondary">Abbrechen</a>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,8 @@
+Hier sollten folgende Bilder hinzugefügt werden:
+
+1. retro-bg.png - Ein pixeliges Hintergrundbild im Retro-Stil
+2. retro-cursor.png - Ein pixeliger Cursor im Retro-Stil
+3. x-logo.png - Das X (Twitter) Logo
+4. favicon.png - Ein Favicon für die Website
+
+Diese Bilder müssen manuell hinzugefügt werden, da sie nicht direkt im Code erstellt werden können. 

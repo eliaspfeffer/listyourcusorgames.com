@@ -1,0 +1,7 @@
+Hier sollten folgende Sound-Dateien hinzugefügt werden:
+
+1. click.mp3 - Ein Klick-Sound im Retro-Stil
+2. success.mp3 - Ein Erfolgs-Sound im Retro-Stil
+3. error.mp3 - Ein Fehler-Sound im Retro-Stil
+
+Diese Sound-Dateien müssen manuell hinzugefügt werden, da sie nicht direkt im Code erstellt werden können. 

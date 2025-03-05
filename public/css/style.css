@@ -1,0 +1,397 @@
+/* Retro-Stil CSS für ListYourAIGames.com */
+
+:root {
+  --primary-color: #ff6b6b;
+  --secondary-color: #4ecdc4;
+  --accent-color: #ffe66d;
+  --dark-color: #292f36;
+  --light-color: #f7fff7;
+  --border-radius: 8px;
+  --box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Press Start 2P", cursive;
+  background-color: var(--dark-color);
+  color: var(--light-color);
+  line-height: 1.6;
+  background-image: url("/images/retro-bg.png");
+  background-repeat: repeat;
+  cursor: none; /* Verstecke den Standard-Cursor */
+}
+
+/* Retro-Cursor */
+.retro-cursor {
+  width: 16px;
+  height: 16px;
+  background-image: url("/images/retro-cursor.png");
+  background-size: contain;
+  position: absolute;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-8px, -8px);
+}
+
+/* Pixelated Hover-Effekt */
+.pixelated {
+  image-rendering: pixelated;
+  transform: scale(1.05) translateY(-2px);
+}
+
+/* Voting Animation */
+.vote-animation {
+  animation: pulse 0.5s ease;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Header */
+header {
+  background-color: rgba(41, 47, 54, 0.9);
+  padding: 20px 0;
+  border-bottom: 4px solid var(--primary-color);
+  margin-bottom: 30px;
+}
+
+.logo a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 1.5rem;
+  text-shadow: 2px 2px 0 var(--dark-color);
+}
+
+nav {
+  margin-top: 15px;
+}
+
+nav ul {
+  display: flex;
+  list-style: none;
+}
+
+nav ul li {
+  margin-right: 20px;
+}
+
+.nav-link {
+  color: var(--light-color);
+  text-decoration: none;
+  padding: 5px 10px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+  border-color: var(--secondary-color);
+  color: var(--secondary-color);
+}
+
+/* Hero Section */
+.hero {
+  text-align: center;
+  padding: 40px 20px;
+  margin-bottom: 40px;
+  background-color: rgba(41, 47, 54, 0.8);
+  border: 4px solid var(--secondary-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+}
+
+.hero h2 {
+  color: var(--accent-color);
+  margin-bottom: 15px;
+  font-size: 1.8rem;
+}
+
+.hero p {
+  margin-bottom: 25px;
+  font-size: 0.9rem;
+}
+
+/* Buttons */
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  text-decoration: none;
+  font-family: "Press Start 2P", cursive;
+  font-size: 0.8rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+}
+
+.btn-secondary {
+  background-color: var(--secondary-color);
+  color: var(--dark-color);
+}
+
+.btn-play {
+  background-color: var(--accent-color);
+  color: var(--dark-color);
+  padding: 8px 15px;
+  font-size: 0.7rem;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Games Container */
+.games-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.game-card {
+  background-color: rgba(41, 47, 54, 0.8);
+  border: 4px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: var(--box-shadow);
+}
+
+.game-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  border-color: var(--accent-color);
+}
+
+.game-image {
+  height: 180px;
+  overflow: hidden;
+}
+
+.game-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.game-card:hover .game-image img {
+  transform: scale(1.05);
+}
+
+.game-info {
+  padding: 20px;
+}
+
+.game-info h3 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.game-info h3 a {
+  color: var(--secondary-color);
+  text-decoration: none;
+}
+
+.game-description {
+  font-size: 0.7rem;
+  margin-bottom: 15px;
+  color: #ccc;
+}
+
+.x-profile {
+  font-size: 0.7rem;
+  margin-bottom: 15px;
+}
+
+.x-profile a {
+  color: #1da1f2;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
+.x-logo {
+  width: 16px;
+  height: 16px;
+  margin-right: 5px;
+}
+
+.game-votes {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.vote-form {
+  margin: 0 5px;
+}
+
+.vote-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.vote-count {
+  font-size: 0.8rem;
+  color: var(--accent-color);
+}
+
+/* Form Styles */
+.form-container {
+  background-color: rgba(41, 47, 54, 0.8);
+  padding: 30px;
+  border-radius: var(--border-radius);
+  border: 4px solid var(--secondary-color);
+  max-width: 700px;
+  margin: 0 auto 40px;
+  box-shadow: var(--box-shadow);
+}
+
+.form-container h2 {
+  color: var(--accent-color);
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.form-container p {
+  text-align: center;
+  margin-bottom: 25px;
+  font-size: 0.8rem;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  color: var(--secondary-color);
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid var(--primary-color);
+  background-color: rgba(247, 255, 247, 0.1);
+  color: var(--light-color);
+  border-radius: var(--border-radius);
+  font-family: "Press Start 2P", cursive;
+  font-size: 0.7rem;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.6rem;
+  color: #aaa;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+}
+
+/* No Games Message */
+.no-games {
+  text-align: center;
+  padding: 40px;
+  background-color: rgba(41, 47, 54, 0.8);
+  border: 4px dashed var(--primary-color);
+  border-radius: var(--border-radius);
+  grid-column: 1 / -1;
+}
+
+.no-games p {
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 20px 0;
+  margin-top: 40px;
+  background-color: rgba(41, 47, 54, 0.9);
+  border-top: 4px solid var(--primary-color);
+}
+
+footer p {
+  font-size: 0.6rem;
+  color: #aaa;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .games-container {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+
+  .hero h2 {
+    font-size: 1.4rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions .btn {
+    margin-bottom: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .games-container {
+    grid-template-columns: 1fr;
+  }
+
+  .hero h2 {
+    font-size: 1.2rem;
+  }
+
+  .logo a {
+    font-size: 1.2rem;
+  }
+
+  nav ul {
+    flex-direction: column;
+  }
+
+  nav ul li {
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+}

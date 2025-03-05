@@ -1,0 +1,57 @@
+<div class="hero">
+  <h2>Willkommen bei ListYourAIGames.com!</h2>
+  <p>Entdecke und teile KI-generierte Minispiele im Retro-Stil</p>
+  <a href="/games/new" class="btn btn-primary">Füge dein Spiel hinzu</a>
+</div>
+
+<div class="games-container">
+  <% if (games && games.length > 0) { %> <% games.forEach(game => { %>
+  <div class="game-card">
+    <div class="game-image">
+      <img src="<%= game.imageUrl %>" alt="<%= game.title %>" />
+    </div>
+    <div class="game-info">
+      <h3>
+        <a href="<%= game.gameUrl %>" target="_blank"><%= game.title %></a>
+      </h3>
+      <p class="game-description"><%= game.description %></p>
+      <% if (game.xProfile) { %>
+      <p class="x-profile">
+        <a
+          href="https://x.com/<%= game.xProfile.replace('@', '') %>"
+          target="_blank"
+        >
+          <img src="/images/x-logo.png" alt="X Logo" class="x-logo" />
+          <%= game.xProfile %>
+        </a>
+      </p>
+      <% } %>
+      <div class="game-votes">
+        <form
+          action="/games/<%= game._id %>/upvote"
+          method="POST"
+          class="vote-form"
+        >
+          <button type="submit" class="vote-btn upvote">👍</button>
+        </form>
+        <span class="vote-count"><%= game.votes %></span>
+        <form
+          action="/games/<%= game._id %>/downvote"
+          method="POST"
+          class="vote-form"
+        >
+          <button type="submit" class="vote-btn downvote">👎</button>
+        </form>
+      </div>
+      <a href="<%= game.gameUrl %>" target="_blank" class="btn btn-play"
+        >Spielen</a
+      >
+    </div>
+  </div>
+  <% }); %> <% } else { %>
+  <div class="no-games">
+    <p>Noch keine Spiele vorhanden. Sei der Erste, der ein Spiel hinzufügt!</p>
+    <a href="/games/new" class="btn btn-primary">Spiel hinzufügen</a>
+  </div>
+  <% } %>
+</div>
