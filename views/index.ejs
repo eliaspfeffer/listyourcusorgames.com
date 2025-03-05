@@ -7,54 +7,48 @@
 <div class="games-container">
   <% if (games && games.length > 0) { %> <% games.forEach(game => { %>
   <div class="game-card">
-    <div class="game-image">
-      <img src="<%= game.imageUrl %>" alt="<%= game.title %>" />
-      <div class="placeholder-image"><%= game.title %></div>
-      <form
-        action="/games/<%= game._id %>/update-image"
-        method="POST"
-        enctype="multipart/form-data"
-        class="update-image-form"
-      >
-        <input type="file" name="image" accept="image/*" class="image-input" />
-        <button type="submit" class="btn btn-small">Bild ändern</button>
-      </form>
-    </div>
-    <div class="game-info">
-      <h3>
-        <a href="/games/<%= game._id %>/play"><%= game.title %></a>
-      </h3>
-      <p class="game-description"><%= game.description %></p>
-      <% if (game.xProfile) { %>
-      <p class="x-profile">
-        <a
-          href="https://x.com/<%= game.xProfile.replace('@', '') %>"
-          target="_blank"
-        >
-          <span class="x-logo"></span>
-          <%= game.xProfile %>
-        </a>
-      </p>
-      <% } %>
-      <div class="game-votes">
-        <form
-          action="/games/<%= game._id %>/upvote"
-          method="POST"
-          class="vote-form"
-        >
-          <button type="submit" class="vote-btn upvote">👍</button>
-        </form>
-        <span class="vote-count"><%= game.votes %></span>
-        <form
-          action="/games/<%= game._id %>/downvote"
-          method="POST"
-          class="vote-form"
-        >
-          <button type="submit" class="vote-btn downvote">👎</button>
-        </form>
+    <a href="/games/<%= game._id %>/play" class="game-card-link">
+      <div class="game-image">
+        <img src="<%= game.imageUrl %>" alt="<%= game.title %>" />
+        <div class="placeholder-image"><%= game.title %></div>
+        <div class="edit-overlay">
+          <span class="tool-icon">🔧</span>
+        </div>
       </div>
-      <a href="/games/<%= game._id %>/play" class="btn btn-play">Play</a>
-    </div>
+      <div class="game-info">
+        <h3><%= game.title %></h3>
+        <p class="game-description"><%= game.description %></p>
+        <% if (game.xProfile) { %>
+        <p class="x-profile">
+          <a
+            href="https://x.com/<%= game.xProfile.replace('@', '') %>"
+            target="_blank"
+          >
+            <span class="x-logo"></span>
+            <%= game.xProfile %>
+          </a>
+        </p>
+        <% } %>
+        <div class="game-votes">
+          <form
+            action="/games/<%= game._id %>/upvote"
+            method="POST"
+            class="vote-form"
+          >
+            <button type="submit" class="vote-btn upvote">👍</button>
+          </form>
+          <span class="vote-count"><%= game.votes %></span>
+          <form
+            action="/games/<%= game._id %>/downvote"
+            method="POST"
+            class="vote-form"
+          >
+            <button type="submit" class="vote-btn downvote">👎</button>
+          </form>
+        </div>
+        <a href="/games/<%= game._id %>/play" class="btn btn-play">Play</a>
+      </div>
+    </a>
   </div>
   <% }); %> <% } else { %>
   <div class="no-games">

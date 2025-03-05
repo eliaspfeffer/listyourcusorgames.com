@@ -1,7 +1,7 @@
 <div class="game-container">
   <div class="game-header">
     <h2><%= game.title %></h2>
-    <button id="fullscreen-toggle" class="btn">Vollbild</button>
+    <button id="fullscreen-toggle" class="btn">Fullscreen</button>
   </div>
 
   <div class="game-wrapper">
@@ -186,9 +186,9 @@
     fullscreenToggle.addEventListener("click", () => {
       gameContainer.classList.toggle("fullscreen");
       if (gameContainer.classList.contains("fullscreen")) {
-        fullscreenToggle.textContent = "Normalgröße";
+        fullscreenToggle.textContent = "Normal size";
       } else {
-        fullscreenToggle.textContent = "Vollbild";
+        fullscreenToggle.textContent = "Fullscreen";
       }
     });
 

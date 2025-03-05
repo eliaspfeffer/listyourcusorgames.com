@@ -51,7 +51,7 @@ let inMemoryGames = [
     _id: "game1",
     title: "Plane Battle Royale",
     description:
-      "Ein spannendes Multiplayer-Flugzeugspiel, in dem du gegen andere Spieler kämpfst. Steuere dein Flugzeug geschickt und schieße deine Gegner ab!",
+      "An exciting multiplayer airplane game where you battle against other players. Control your aircraft skillfully and shoot down your opponents!",
     gameUrl: "https://fly.pieter.com",
     imageUrl: "https://fly.pieter.com/preview.png",
     xProfile: "@levelsio",
@@ -62,35 +62,24 @@ let inMemoryGames = [
 let useInMemoryDB = true; // Use In-Memory DB by default
 
 // Try to connect to MongoDB
-try {
-  mongoose
-    .connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // Reduce timeout to 5 seconds
-    })
-    .then(() => {
-      console.log("MongoDB connected");
-      useInMemoryDB = false;
-    })
-    .catch((err) => {
-      console.error("MongoDB connection error:", err);
-      console.log("Using In-Memory database as fallback");
-      useInMemoryDB = true;
-    });
-} catch (err) {
-  console.error("Error connecting to MongoDB:", err);
-  console.log("Using In-Memory database as fallback");
-  useInMemoryDB = true;
-}
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+  })
+  .then(() => {
+    console.log("MongoDB connected successfully");
+    useInMemoryDB = false;
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+    console.log("Using In-Memory database as fallback");
+    useInMemoryDB = true;
+  });
 
 // Models
-let Game;
-try {
-  Game = require("./models/Game");
-} catch (err) {
-  console.error("Error loading Game model:", err);
-}
+const Game = require("./models/Game");
 
 // Socket.IO nur lokal initialisieren
 if (process.env.NODE_ENV !== "production") {
@@ -226,6 +215,10 @@ async function getRandomCatGif() {
 // Add game - Process
 app.post("/games", upload.single("image"), async (req, res) => {
   try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error("MONGODB_URI is not set in environment variables");
+    }
+
     let imageUrl;
 
     if (req.file) {
@@ -271,7 +264,13 @@ app.post("/games", upload.single("image"), async (req, res) => {
     res.redirect("/");
   } catch (err) {
     console.error("Error saving game:", err);
-    res.status(500).send("Error saving game");
+    res.status(500).json({
+      error: "Error saving game",
+      details:
+        process.env.NODE_ENV === "development"
+          ? err.message
+          : "Internal server error",
+    });
   }
 });
 
