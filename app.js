@@ -7,6 +7,10 @@ const path = require("path");
 const expressLayouts = require("express-ejs-layouts");
 const http = require("http");
 const socketIo = require("socket.io");
+const multer = require("multer");
+const sharp = require("sharp");
+const axios = require("axios");
+const fs = require("fs").promises;
 
 // URL-Normalisierungsfunktion
 function normalizeUrl(url) {
@@ -46,33 +50,13 @@ app.set("layout", "layout");
 let inMemoryGames = [
   {
     _id: "game1",
-    title: "Pixel Jumper",
+    title: "Plane Battle Royale",
     description:
-      "An AI-generated platform game in retro style. Jump over obstacles and collect coins!",
-    gameUrl: "https://example.com/pixeljumper",
-    imageUrl: "https://via.placeholder.com/300x200.png?text=Pixel+Jumper",
-    xProfile: "@pixeljumper",
-    votes: 15,
-  },
-  {
-    _id: "game2",
-    title: "Space Invaders AI",
-    description:
-      "A modern AI interpretation of the classic Space Invaders with procedurally generated enemies.",
-    gameUrl: "https://example.com/spaceinvaders",
-    imageUrl: "https://via.placeholder.com/300x200.png?text=Space+Invaders+AI",
-    xProfile: "@aispacegames",
-    votes: 23,
-  },
-  {
-    _id: "game3",
-    title: "Dungeon Explorer",
-    description:
-      "Explore procedurally generated dungeons in this roguelike game that was entirely created by an AI.",
-    gameUrl: "https://example.com/dungeonexplorer",
-    imageUrl: "https://via.placeholder.com/300x200.png?text=Dungeon+Explorer",
-    xProfile: "@dungeonai",
-    votes: 8,
+      "Ein spannendes Multiplayer-Flugzeugspiel, in dem du gegen andere Spieler kämpfst. Steuere dein Flugzeug geschickt und schieße deine Gegner ab!",
+    gameUrl: "https://fly.pieter.com",
+    imageUrl: "https://fly.pieter.com/preview.png",
+    xProfile: "@levelsio",
+    votes: 0,
   },
 ];
 
@@ -146,7 +130,6 @@ app.get("/", async (req, res) => {
     if (useInMemoryDB) {
       games = inMemoryGames.sort((a, b) => {
         if (b.votes === a.votes) {
-          // Bei gleicher Stimmenzahl das neuere Spiel (höhere ID) zuerst
           return b._id.localeCompare(a._id);
         }
         return b.votes - a.votes;
@@ -157,7 +140,6 @@ app.get("/", async (req, res) => {
     res.render("index", { games });
   } catch (err) {
     console.error("Error loading games:", err);
-    // Fallback to In-Memory DB on error
     const games = inMemoryGames.sort((a, b) => {
       if (b.votes === a.votes) {
         return b._id.localeCompare(a._id);
@@ -168,21 +150,105 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Add game - Show form
+// Add game - Show form (Diese Route muss VOR der :id Route kommen)
 app.get("/games/new", (req, res) => {
   res.render("new");
 });
 
-// Add game - Process
-app.post("/games", async (req, res) => {
+// Spielansicht Route
+app.get("/games/:id/play", async (req, res) => {
   try {
+    let game;
+    if (useInMemoryDB) {
+      game = inMemoryGames.find((g) => g._id === req.params.id);
+    } else {
+      game = await Game.findById(req.params.id);
+    }
+
+    if (!game) {
+      return res.status(404).send("Spiel nicht gefunden");
+    }
+
+    res.render("play", { game });
+  } catch (err) {
+    console.error("Error loading game:", err);
+    res.status(500).send("Fehler beim Laden des Spiels");
+  }
+});
+
+// Multer Konfiguration für Bild-Upload
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "public/uploads/");
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Nur Bilder sind erlaubt!"), false);
+    }
+  },
+});
+
+// Erstelle Upload-Verzeichnis, falls es nicht existiert
+(async () => {
+  try {
+    await fs.mkdir("public/uploads", { recursive: true });
+  } catch (err) {
+    console.error("Fehler beim Erstellen des Upload-Verzeichnisses:", err);
+  }
+})();
+
+// Funktion zum Abrufen eines zufälligen Cat GIFs
+async function getRandomCatGif() {
+  try {
+    const response = await axios.get(
+      "https://api.thecatapi.com/v1/images/search?mime_types=gif"
+    );
+    return response.data[0].url;
+  } catch (err) {
+    console.error("Fehler beim Abrufen des Cat GIFs:", err);
+    return "https://http.cat/404"; // Fallback, falls Cat API nicht funktioniert
+  }
+}
+
+// Add game - Process
+app.post("/games", upload.single("image"), async (req, res) => {
+  try {
+    let imageUrl;
+
+    if (req.file) {
+      // Wenn ein Bild hochgeladen wurde, verarbeite es
+      const resizedImagePath = "public/uploads/resized-" + req.file.filename;
+      await sharp(req.file.path)
+        .resize(300, 200, { fit: "inside" })
+        .toFile(resizedImagePath);
+
+      // Lösche das Original und verwende das verkleinerte Bild
+      await fs.unlink(req.file.path);
+      imageUrl = "/uploads/resized-" + req.file.filename;
+    } else if (req.body.imageUrl) {
+      // Wenn eine URL angegeben wurde
+      imageUrl = normalizeUrl(req.body.imageUrl);
+    } else {
+      // Wenn kein Bild angegeben wurde, verwende ein zufälliges Cat GIF
+      imageUrl = await getRandomCatGif();
+    }
+
     if (useInMemoryDB) {
       const newGame = {
         _id: "game" + (inMemoryGames.length + 1),
         title: req.body.title,
         description: req.body.description,
         gameUrl: normalizeUrl(req.body.gameUrl),
-        imageUrl: normalizeUrl(req.body.imageUrl),
+        imageUrl: imageUrl,
         xProfile: req.body.xProfile || "",
         votes: 0,
       };
@@ -192,7 +258,7 @@ app.post("/games", async (req, res) => {
         title: req.body.title,
         description: req.body.description,
         gameUrl: normalizeUrl(req.body.gameUrl),
-        imageUrl: normalizeUrl(req.body.imageUrl),
+        imageUrl: imageUrl,
         xProfile: req.body.xProfile || "",
         votes: 0,
       });
@@ -204,6 +270,66 @@ app.post("/games", async (req, res) => {
     res.status(500).send("Error saving game");
   }
 });
+
+// Bild ändern Route
+app.post(
+  "/games/:id/update-image",
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      let game;
+      let imageUrl;
+
+      if (req.file) {
+        // Wenn ein Bild hochgeladen wurde, verarbeite es
+        const resizedImagePath = "public/uploads/resized-" + req.file.filename;
+        await sharp(req.file.path)
+          .resize(300, 200, { fit: "inside" })
+          .toFile(resizedImagePath);
+
+        // Lösche das Original und verwende das verkleinerte Bild
+        await fs.unlink(req.file.path);
+        imageUrl = "/uploads/resized-" + req.file.filename;
+      } else if (req.body.imageUrl) {
+        // Wenn eine URL angegeben wurde
+        imageUrl = normalizeUrl(req.body.imageUrl);
+      } else {
+        // Wenn kein Bild angegeben wurde, verwende ein zufälliges Cat GIF
+        imageUrl = await getRandomCatGif();
+      }
+
+      if (useInMemoryDB) {
+        game = inMemoryGames.find((g) => g._id === req.params.id);
+        if (game) {
+          // Lösche altes Bild, wenn es ein Upload war
+          if (game.imageUrl.startsWith("/uploads/")) {
+            try {
+              await fs.unlink("public" + game.imageUrl);
+            } catch (err) {
+              console.error("Fehler beim Löschen des alten Bildes:", err);
+            }
+          }
+          game.imageUrl = imageUrl;
+        }
+      } else {
+        const oldGame = await Game.findById(req.params.id);
+        if (oldGame && oldGame.imageUrl.startsWith("/uploads/")) {
+          try {
+            await fs.unlink("public" + oldGame.imageUrl);
+          } catch (err) {
+            console.error("Fehler beim Löschen des alten Bildes:", err);
+          }
+        }
+        await Game.findByIdAndUpdate(req.params.id, { imageUrl: imageUrl });
+      }
+
+      res.redirect("/");
+    } catch (err) {
+      console.error("Error updating image:", err);
+      res.status(500).send("Error updating image");
+    }
+  }
+);
 
 // Upvote game
 app.post("/games/:id/upvote", async (req, res) => {

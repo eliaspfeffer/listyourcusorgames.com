@@ -1,47 +1,113 @@
 <div class="form-container">
-  <h2>Add your AI-generated game</h2>
-  <p>Share your game with the community - no registration required!</p>
-
-  <form action="/games" method="POST" class="game-form">
+  <h2>Neues Spiel hinzufügen</h2>
+  <form action="/games" method="POST" enctype="multipart/form-data">
     <div class="form-group">
-      <label for="title">Game Title *</label>
-      <input type="text" id="title" name="title" required />
+      <label for="title">Titel:</label>
+      <input
+        type="text"
+        id="title"
+        name="title"
+        required
+        class="form-control"
+      />
     </div>
 
     <div class="form-group">
-      <label for="description">Description *</label>
+      <label for="description">Beschreibung:</label>
       <textarea
         id="description"
         name="description"
-        rows="4"
         required
+        class="form-control"
       ></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="gameUrl">Spiel-URL:</label>
+      <input
+        type="text"
+        id="gameUrl"
+        name="gameUrl"
+        required
+        class="form-control"
+      />
+      <small>Die URL deines Spiels (z.B. fly.pieter.com)</small>
+    </div>
+
+    <div class="form-group">
+      <label for="image">Bild hochladen:</label>
+      <input
+        type="file"
+        id="image"
+        name="image"
+        accept="image/*"
+        class="form-control"
+      />
       <small
-        >Briefly describe what your game is about (max. 200 characters)</small
+        >Optional: Lade ein Bild hoch oder gib eine URL an. Wenn nichts
+        angegeben wird, wird ein zufälliges Katzen-GIF verwendet.</small
       >
     </div>
 
     <div class="form-group">
-      <label for="gameUrl">Game URL *</label>
-      <input type="url" id="gameUrl" name="gameUrl" required />
-      <small>Link to the website where your game can be played</small>
+      <label for="imageUrl">Oder Bild-URL:</label>
+      <input type="text" id="imageUrl" name="imageUrl" class="form-control" />
     </div>
 
     <div class="form-group">
-      <label for="imageUrl">Image URL *</label>
-      <input type="url" id="imageUrl" name="imageUrl" required />
-      <small>Link to a screenshot or preview image of your game</small>
+      <label for="xProfile">X (Twitter) Profil:</label>
+      <input type="text" id="xProfile" name="xProfile" class="form-control" />
+      <small>Optional: Dein X (Twitter) Handle (z.B. @username)</small>
     </div>
 
-    <div class="form-group">
-      <label for="xProfile">X (Twitter) Profile</label>
-      <input type="text" id="xProfile" name="xProfile" />
-      <small>Your X profile (optional, e.g. @username)</small>
-    </div>
-
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary">Add Game</button>
-      <a href="/" class="btn btn-secondary">Cancel</a>
-    </div>
+    <button type="submit" class="btn btn-primary">Spiel hinzufügen</button>
   </form>
 </div>
+
+<style>
+  .form-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 8px;
+    border: 2px solid #00ff00;
+    background: rgba(0, 0, 0, 0.8);
+    color: #00ff00;
+    font-family: "Press Start 2P", cursive;
+    font-size: 12px;
+  }
+
+  textarea.form-control {
+    height: 100px;
+    resize: vertical;
+  }
+
+  small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 10px;
+  }
+
+  .btn-primary {
+    background: #00ff00;
+    color: black;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-family: "Press Start 2P", cursive;
+    font-size: 14px;
+  }
+
+  .btn-primary:hover {
+    background: #00cc00;
+  }
+</style>
