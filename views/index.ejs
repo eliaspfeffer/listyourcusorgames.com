@@ -8,13 +8,6 @@
   <% if (games && games.length > 0) { %> <% games.forEach(game => { %>
   <div class="game-card">
     <a href="/games/<%= game._id %>/play" class="game-card-link">
-      <div class="game-image">
-        <img src="<%= game.imageUrl %>" alt="<%= game.title %>" />
-        <div class="placeholder-image"><%= game.title %></div>
-        <div class="edit-overlay">
-          <span class="tool-icon">🔧</span>
-        </div>
-      </div>
       <div class="game-info">
         <h3><%= game.title %></h3>
         <p class="game-description"><%= game.description %></p>
@@ -46,7 +39,6 @@
             <button type="submit" class="vote-btn downvote">👎</button>
           </form>
         </div>
-        <a href="/games/<%= game._id %>/play" class="btn btn-play">Play</a>
       </div>
     </a>
   </div>

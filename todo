@@ -1,5 +1,1 @@
-"Vollbild" bitte auf englisch übersetzen
-"Ein spannendes Multiplayer-Flugzeugspiel, in dem du gegen andere Spieler kämpfst. Steuere dein Flugzeug geschickt und schieße deine Gegner ab!" Auf englisch übersetzen.
-Wenn man auf das Spiel klickt "also auf Plane Battle Royal" etc sollte man zum Spiel kommen. Nicht erst, wenn man auf "Play" klickt. Wenn man über dem Spiel hovert und noch nicht klickt, sollte ein Werkzeug Symbol angezegit werden, um das Bild zu ändern.
-Bilder werden noch nicht richtig geladen. Liegt vermutlich daran, dass die Integration mit der Datenbank noch nicht richtig funktioniert.
-"Internal Server Error" wird angezeigt, wenn ich über Vercel ein Spiel hinzufüge.
+Lösch alles bzgl. Bilder hinzufügen für ein Spiel. Brauch ich doch nicht.

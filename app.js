@@ -7,10 +7,6 @@ const path = require("path");
 const expressLayouts = require("express-ejs-layouts");
 const http = require("http");
 const socketIo = require("socket.io");
-const multer = require("multer");
-const sharp = require("sharp");
-const axios = require("axios");
-const fs = require("fs").promises;
 
 // URL-Normalisierungsfunktion
 function normalizeUrl(url) {
@@ -53,7 +49,6 @@ let inMemoryGames = [
     description:
       "An exciting multiplayer airplane game where you battle against other players. Control your aircraft skillfully and shoot down your opponents!",
     gameUrl: "https://fly.pieter.com",
-    imageUrl: "https://fly.pieter.com/preview.png",
     xProfile: "@levelsio",
     votes: 0,
   },
@@ -143,7 +138,7 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Add game - Show form (Diese Route muss VOR der :id Route kommen)
+// Add game - Show form
 app.get("/games/new", (req, res) => {
   res.render("new");
 });
@@ -159,84 +154,21 @@ app.get("/games/:id/play", async (req, res) => {
     }
 
     if (!game) {
-      return res.status(404).send("Spiel nicht gefunden");
+      return res.status(404).send("Game not found");
     }
 
     res.render("play", { game });
   } catch (err) {
     console.error("Error loading game:", err);
-    res.status(500).send("Fehler beim Laden des Spiels");
+    res.status(500).send("Error loading game");
   }
 });
-
-// Multer Konfiguration für Bild-Upload
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "public/uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
-
-const upload = multer({
-  storage: storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Nur Bilder sind erlaubt!"), false);
-    }
-  },
-});
-
-// Erstelle Upload-Verzeichnis, falls es nicht existiert
-(async () => {
-  try {
-    await fs.mkdir("public/uploads", { recursive: true });
-  } catch (err) {
-    console.error("Fehler beim Erstellen des Upload-Verzeichnisses:", err);
-  }
-})();
-
-// Funktion zum Abrufen eines zufälligen Cat GIFs
-async function getRandomCatGif() {
-  try {
-    const response = await axios.get(
-      "https://api.thecatapi.com/v1/images/search?mime_types=gif"
-    );
-    return response.data[0].url;
-  } catch (err) {
-    console.error("Fehler beim Abrufen des Cat GIFs:", err);
-    return "https://http.cat/404"; // Fallback, falls Cat API nicht funktioniert
-  }
-}
 
 // Add game - Process
-app.post("/games", upload.single("image"), async (req, res) => {
+app.post("/games", async (req, res) => {
   try {
     if (!process.env.MONGODB_URI) {
       throw new Error("MONGODB_URI is not set in environment variables");
-    }
-
-    let imageUrl;
-
-    if (req.file) {
-      // Wenn ein Bild hochgeladen wurde, verarbeite es
-      const resizedImagePath = "public/uploads/resized-" + req.file.filename;
-      await sharp(req.file.path)
-        .resize(300, 200, { fit: "inside" })
-        .toFile(resizedImagePath);
-
-      // Lösche das Original und verwende das verkleinerte Bild
-      await fs.unlink(req.file.path);
-      imageUrl = "/uploads/resized-" + req.file.filename;
-    } else if (req.body.imageUrl) {
-      // Wenn eine URL angegeben wurde
-      imageUrl = normalizeUrl(req.body.imageUrl);
-    } else {
-      // Wenn kein Bild angegeben wurde, verwende ein zufälliges Cat GIF
-      imageUrl = await getRandomCatGif();
     }
 
     if (useInMemoryDB) {
@@ -245,7 +177,6 @@ app.post("/games", upload.single("image"), async (req, res) => {
         title: req.body.title,
         description: req.body.description,
         gameUrl: normalizeUrl(req.body.gameUrl),
-        imageUrl: imageUrl,
         xProfile: req.body.xProfile || "",
         votes: 0,
       };
@@ -255,7 +186,6 @@ app.post("/games", upload.single("image"), async (req, res) => {
         title: req.body.title,
         description: req.body.description,
         gameUrl: normalizeUrl(req.body.gameUrl),
-        imageUrl: imageUrl,
         xProfile: req.body.xProfile || "",
         votes: 0,
       });
@@ -273,66 +203,6 @@ app.post("/games", upload.single("image"), async (req, res) => {
     });
   }
 });
-
-// Bild ändern Route
-app.post(
-  "/games/:id/update-image",
-  upload.single("image"),
-  async (req, res) => {
-    try {
-      let game;
-      let imageUrl;
-
-      if (req.file) {
-        // Wenn ein Bild hochgeladen wurde, verarbeite es
-        const resizedImagePath = "public/uploads/resized-" + req.file.filename;
-        await sharp(req.file.path)
-          .resize(300, 200, { fit: "inside" })
-          .toFile(resizedImagePath);
-
-        // Lösche das Original und verwende das verkleinerte Bild
-        await fs.unlink(req.file.path);
-        imageUrl = "/uploads/resized-" + req.file.filename;
-      } else if (req.body.imageUrl) {
-        // Wenn eine URL angegeben wurde
-        imageUrl = normalizeUrl(req.body.imageUrl);
-      } else {
-        // Wenn kein Bild angegeben wurde, verwende ein zufälliges Cat GIF
-        imageUrl = await getRandomCatGif();
-      }
-
-      if (useInMemoryDB) {
-        game = inMemoryGames.find((g) => g._id === req.params.id);
-        if (game) {
-          // Lösche altes Bild, wenn es ein Upload war
-          if (game.imageUrl.startsWith("/uploads/")) {
-            try {
-              await fs.unlink("public" + game.imageUrl);
-            } catch (err) {
-              console.error("Fehler beim Löschen des alten Bildes:", err);
-            }
-          }
-          game.imageUrl = imageUrl;
-        }
-      } else {
-        const oldGame = await Game.findById(req.params.id);
-        if (oldGame && oldGame.imageUrl.startsWith("/uploads/")) {
-          try {
-            await fs.unlink("public" + oldGame.imageUrl);
-          } catch (err) {
-            console.error("Fehler beim Löschen des alten Bildes:", err);
-          }
-        }
-        await Game.findByIdAndUpdate(req.params.id, { imageUrl: imageUrl });
-      }
-
-      res.redirect("/");
-    } catch (err) {
-      console.error("Error updating image:", err);
-      res.status(500).send("Error updating image");
-    }
-  }
-);
 
 // Upvote game
 app.post("/games/:id/upvote", async (req, res) => {
@@ -370,7 +240,7 @@ app.post("/games/:id/downvote", async (req, res) => {
   }
 });
 
-// Start server (ändern Sie app.listen zu server.listen)
+// Start server
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Website available at http://localhost:${PORT}`);

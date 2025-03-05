@@ -1,8 +1,8 @@
 <div class="form-container">
-  <h2>Neues Spiel hinzufügen</h2>
-  <form action="/games" method="POST" enctype="multipart/form-data">
+  <h2>Add New Game</h2>
+  <form action="/games" method="POST">
     <div class="form-group">
-      <label for="title">Titel:</label>
+      <label for="title">Title:</label>
       <input
         type="text"
         id="title"
@@ -13,7 +13,7 @@
     </div>
 
     <div class="form-group">
-      <label for="description">Beschreibung:</label>
+      <label for="description">Description:</label>
       <textarea
         id="description"
         name="description"
@@ -23,7 +23,7 @@
     </div>
 
     <div class="form-group">
-      <label for="gameUrl">Spiel-URL:</label>
+      <label for="gameUrl">Game URL:</label>
       <input
         type="text"
         id="gameUrl"
@@ -31,36 +31,16 @@
         required
         class="form-control"
       />
-      <small>Die URL deines Spiels (z.B. fly.pieter.com)</small>
+      <small>The URL of your game (e.g. fly.pieter.com)</small>
     </div>
 
     <div class="form-group">
-      <label for="image">Bild hochladen:</label>
-      <input
-        type="file"
-        id="image"
-        name="image"
-        accept="image/*"
-        class="form-control"
-      />
-      <small
-        >Optional: Lade ein Bild hoch oder gib eine URL an. Wenn nichts
-        angegeben wird, wird ein zufälliges Katzen-GIF verwendet.</small
-      >
-    </div>
-
-    <div class="form-group">
-      <label for="imageUrl">Oder Bild-URL:</label>
-      <input type="text" id="imageUrl" name="imageUrl" class="form-control" />
-    </div>
-
-    <div class="form-group">
-      <label for="xProfile">X (Twitter) Profil:</label>
+      <label for="xProfile">X (Twitter) Profile:</label>
       <input type="text" id="xProfile" name="xProfile" class="form-control" />
-      <small>Optional: Dein X (Twitter) Handle (z.B. @username)</small>
+      <small>Optional: Your X (Twitter) handle (e.g. @username)</small>
     </div>
 
-    <button type="submit" class="btn btn-primary">Spiel hinzufügen</button>
+    <button type="submit" class="btn btn-primary">Add Game</button>
   </form>
 </div>
 
