@@ -6,7 +6,7 @@ const methodOverride = require("method-override");
 const path = require("path");
 const expressLayouts = require("express-ejs-layouts");
 
-// Initialize Express!
+// Initialize Express!! :)
 const app = express();
 const PORT = process.env.PORT || 3000;
 
