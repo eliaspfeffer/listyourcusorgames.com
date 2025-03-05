@@ -9,7 +9,8 @@
       <iframe
         id="game-frame"
         src="<%= game.gameUrl %>"
-        allow="fullscreen"
+        allow="fullscreen; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
         allowfullscreen
         frameborder="0"
       ></iframe>
@@ -154,89 +155,74 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", async () => {
-    // Initialisiere Socket.IO
     let socket;
-
-    // Hole die Spiel-ID aus der URL
     const gameId = window.location.pathname.split("/")[2];
-
-    // Prüfe, ob wir auf Vercel oder lokal sind
     const isVercel = window.location.hostname.includes("vercel.app");
 
-    if (isVercel) {
-      // Auf Vercel: Initialisiere Socket.IO über die API-Route
-      await fetch("/api/socketio");
-      socket = io();
-    } else {
-      // Lokal: Direkte Verbindung
-      socket = io();
-    }
-
-    // Trete dem Spiel-Raum bei
-    socket.emit("join game", gameId);
-
-    const chatForm = document.getElementById("chat-form");
-    const chatInput = document.getElementById("chat-input");
-    const chatMessages = document.getElementById("chat-messages");
-    const usernameInput = document.getElementById("username-input");
-    const fullscreenToggle = document.getElementById("fullscreen-toggle");
-    const gameContainer = document.querySelector(".game-container");
-
-    // Vollbildmodus
-    fullscreenToggle.addEventListener("click", () => {
-      gameContainer.classList.toggle("fullscreen");
-      if (gameContainer.classList.contains("fullscreen")) {
-        fullscreenToggle.textContent = "Normal size";
+    try {
+      if (isVercel) {
+        await fetch("/api/socketio");
+        socket = io({
+          path: "/api/socketio",
+          addTrailingSlash: false,
+        });
       } else {
-        fullscreenToggle.textContent = "Fullscreen";
+        socket = io();
       }
-    });
 
-    // Username setzen
-    usernameInput.addEventListener("change", () => {
-      const username = usernameInput.value.trim();
-      if (username) {
-        socket.emit("set username", username);
-        // Speichere Username im localStorage
-        localStorage.setItem("chatUsername", username);
+      socket.on("connect", () => {
+        console.log("Socket verbunden:", socket.id);
+        socket.emit("join game", gameId);
+      });
+
+      socket.on("connect_error", (error) => {
+        console.error("Socket Verbindungsfehler:", error);
+      });
+
+      socket.on("error", (error) => {
+        console.error("Socket Fehler:", error);
+      });
+
+      const chatForm = document.getElementById("chat-form");
+      const chatInput = document.getElementById("chat-input");
+      const chatMessages = document.getElementById("chat-messages");
+      const usernameInput = document.getElementById("username-input");
+      const fullscreenToggle = document.getElementById("fullscreen-toggle");
+      const gameContainer = document.querySelector(".game-container");
+
+      fullscreenToggle.addEventListener("click", () => {
+        gameContainer.classList.toggle("fullscreen");
+        fullscreenToggle.textContent = gameContainer.classList.contains(
+          "fullscreen"
+        )
+          ? "Normal size"
+          : "Fullscreen";
+      });
+
+      usernameInput.addEventListener("change", () => {
+        const username = usernameInput.value.trim();
+        if (username) {
+          socket.emit("set username", username);
+          localStorage.setItem("chatUsername", username);
+        }
+      });
+
+      const savedUsername = localStorage.getItem("chatUsername");
+      if (savedUsername) {
+        usernameInput.value = savedUsername;
+        socket.emit("set username", savedUsername);
       }
-    });
 
-    // Lade gespeicherten Username
-    const savedUsername = localStorage.getItem("chatUsername");
-    if (savedUsername) {
-      usernameInput.value = savedUsername;
-      socket.emit("set username", savedUsername);
-    }
+      chatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const msg = chatInput.value.trim();
+        if (msg) {
+          socket.emit("chat message", { gameId, msg });
+          chatInput.value = "";
+        }
+      });
 
-    // Chat-Nachricht senden
-    chatForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const msg = chatInput.value.trim();
-      if (msg) {
-        socket.emit("chat message", { gameId, msg });
-        chatInput.value = "";
-      }
-    });
-
-    // Empfangene Nachrichten anzeigen
-    socket.on("chat message", (msg) => {
-      const div = document.createElement("div");
-      div.className = "message";
-      const time = new Date(msg.timestamp).toLocaleTimeString();
-      div.innerHTML = `
-        <span class="timestamp">[${time}]</span>
-        <span class="username">${msg.username}:</span>
-        ${msg.text}
-      `;
-      chatMessages.appendChild(div);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-
-    // Vorherige Nachrichten laden
-    socket.on("previous messages", (messages) => {
-      chatMessages.innerHTML = "";
-      messages.forEach((msg) => {
+      socket.on("chat message", (msg) => {
         const div = document.createElement("div");
         div.className = "message";
         const time = new Date(msg.timestamp).toLocaleTimeString();
@@ -246,8 +232,26 @@
           ${msg.text}
         `;
         chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
       });
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
+
+      socket.on("previous messages", (messages) => {
+        chatMessages.innerHTML = "";
+        messages.forEach((msg) => {
+          const div = document.createElement("div");
+          div.className = "message";
+          const time = new Date(msg.timestamp).toLocaleTimeString();
+          div.innerHTML = `
+            <span class="timestamp">[${time}]</span>
+            <span class="username">${msg.username}:</span>
+            ${msg.text}
+          `;
+          chatMessages.appendChild(div);
+        });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+    } catch (error) {
+      console.error("Fehler bei der Socket.IO-Initialisierung:", error);
+    }
   });
 </script>

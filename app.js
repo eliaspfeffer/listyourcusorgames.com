@@ -15,12 +15,18 @@ function normalizeUrl(url) {
   // Entferne führende und nachfolgende Leerzeichen
   url = url.trim();
 
-  // Wenn keine Protokoll-Angabe vorhanden ist, füge https:// hinzu
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = "https://" + url;
+  // Wenn die URL bereits mit http:// oder https:// beginnt, behalte sie bei
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
   }
 
-  return url;
+  // Wenn die URL mit // beginnt, füge https: hinzu
+  if (url.startsWith("//")) {
+    return "https:" + url;
+  }
+
+  // Füge https:// hinzu, wenn kein Protokoll angegeben ist
+  return "https://" + url;
 }
 
 // Initialize Express!! :)

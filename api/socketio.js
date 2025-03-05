@@ -31,8 +31,17 @@ const ChatMessage =
 
 const ioHandler = async (req, res) => {
   if (!res.socket.server.io) {
-    console.log("Erste Socket.IO-Initialisierung");
-    const io = new Server(res.socket.server);
+    console.log("Socket.IO-Initialisierung...");
+
+    const io = new Server(res.socket.server, {
+      path: "/api/socketio",
+      addTrailingSlash: false,
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+      },
+    });
+
     res.socket.server.io = io;
 
     // Verbinde mit MongoDB, wenn noch nicht verbunden
@@ -49,12 +58,17 @@ const ioHandler = async (req, res) => {
     }
 
     io.on("connection", (socket) => {
-      console.log("Neue Socket-Verbindung");
+      console.log("Neue Socket-Verbindung:", socket.id);
 
       // Raum betreten wenn ein Spiel geöffnet wird
       socket.on("join game", async (gameId) => {
+        if (!gameId) {
+          console.error("Keine gameId beim Join-Event");
+          return;
+        }
+
         socket.join(gameId);
-        console.log(`Socket joined game: ${gameId}`);
+        console.log(`Socket ${socket.id} ist Spiel beigetreten: ${gameId}`);
 
         // Lade vorherige Nachrichten für dieses Spiel
         try {
@@ -64,24 +78,34 @@ const ioHandler = async (req, res) => {
             .lean();
           socket.emit("previous messages", messages.reverse());
         } catch (err) {
-          console.error("Error loading messages:", err);
+          console.error("Fehler beim Laden der Nachrichten:", err);
+          socket.emit("error", "Fehler beim Laden der Nachrichten");
         }
       });
 
       socket.on("set username", (username) => {
-        socket.username = username;
+        if (typeof username === "string" && username.trim()) {
+          socket.username = username.trim();
+          console.log(`Username gesetzt für Socket ${socket.id}: ${username}`);
+        }
       });
 
       socket.on("chat message", async ({ gameId, msg }) => {
+        if (!gameId || !msg || typeof msg !== "string") {
+          console.error("Ungültige Nachricht oder gameId");
+          return;
+        }
+
         try {
           const message = new ChatMessage({
             username: socket.username || "Anonym",
-            text: msg,
+            text: msg.trim(),
             gameId: gameId,
             timestamp: new Date(),
           });
 
           await message.save();
+          console.log(`Nachricht gespeichert für Spiel ${gameId}`);
 
           // Sende die Nachricht nur an Clients im gleichen Spiel-Raum
           io.to(gameId).emit("chat message", {
@@ -90,8 +114,13 @@ const ioHandler = async (req, res) => {
             timestamp: message.timestamp,
           });
         } catch (err) {
-          console.error("Error saving chat message:", err);
+          console.error("Fehler beim Speichern der Nachricht:", err);
+          socket.emit("error", "Fehler beim Senden der Nachricht");
         }
+      });
+
+      socket.on("disconnect", () => {
+        console.log(`Socket getrennt: ${socket.id}`);
       });
     });
   }
