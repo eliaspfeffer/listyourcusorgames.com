@@ -1,7 +1,7 @@
 <div class="hero">
-  <h2>Willkommen bei ListYourAIGames.com!</h2>
-  <p>Entdecke und teile KI-generierte Minispiele im Retro-Stil</p>
-  <a href="/games/new" class="btn btn-primary">Füge dein Spiel hinzu</a>
+  <h2>Welcome to ListYourAIGames.com!</h2>
+  <p>Discover and share AI-generated mini games in retro style</p>
+  <a href="/games/new" class="btn btn-primary">Add your game</a>
 </div>
 
 <div class="games-container">
@@ -9,6 +9,7 @@
   <div class="game-card">
     <div class="game-image">
       <img src="<%= game.imageUrl %>" alt="<%= game.title %>" />
+      <div class="placeholder-image"><%= game.title %></div>
     </div>
     <div class="game-info">
       <h3>
@@ -21,7 +22,7 @@
           href="https://x.com/<%= game.xProfile.replace('@', '') %>"
           target="_blank"
         >
-          <img src="/images/x-logo.png" alt="X Logo" class="x-logo" />
+          <span class="x-logo"></span>
           <%= game.xProfile %>
         </a>
       </p>
@@ -44,14 +45,14 @@
         </form>
       </div>
       <a href="<%= game.gameUrl %>" target="_blank" class="btn btn-play"
-        >Spielen</a
+        >Play</a
       >
     </div>
   </div>
   <% }); %> <% } else { %>
   <div class="no-games">
-    <p>Noch keine Spiele vorhanden. Sei der Erste, der ein Spiel hinzufügt!</p>
-    <a href="/games/new" class="btn btn-primary">Spiel hinzufügen</a>
+    <p>No games available yet. Be the first to add a game!</p>
+    <a href="/games/new" class="btn btn-primary">Add a game</a>
   </div>
   <% } %>
 </div>

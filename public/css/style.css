@@ -21,21 +21,26 @@ body {
   background-color: var(--dark-color);
   color: var(--light-color);
   line-height: 1.6;
-  background-image: url("/images/retro-bg.png");
-  background-repeat: repeat;
-  cursor: none; /* Verstecke den Standard-Cursor */
+  background-image: linear-gradient(
+      to right,
+      rgba(41, 47, 54, 0.9) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(41, 47, 54, 0.9) 1px, transparent 1px);
+  background-size: 20px 20px;
+  cursor: default; /* Standardmäßiger Cursor, da wir kein Bild haben */
 }
 
 /* Retro-Cursor */
 .retro-cursor {
   width: 16px;
   height: 16px;
-  background-image: url("/images/retro-cursor.png");
-  background-size: contain;
+  background-color: var(--accent-color);
   position: absolute;
   pointer-events: none;
   z-index: 9999;
   transform: translate(-8px, -8px);
+  clip-path: polygon(0% 0%, 100% 0%, 100% 70%, 70% 70%, 70% 100%, 0% 100%);
 }
 
 /* Pixelated Hover-Effekt */
@@ -193,6 +198,8 @@ nav ul li {
 .game-image {
   height: 180px;
   overflow: hidden;
+  background-color: var(--dark-color);
+  position: relative;
 }
 
 .game-image img {
@@ -200,6 +207,39 @@ nav ul li {
   height: 100%;
   object-fit: cover;
   transition: transform 0.5s ease;
+}
+
+/* Fallback für fehlende Bilder */
+.game-image img[src*="placeholder.com"],
+.game-image img[src=""],
+.game-image img:not([src]) {
+  display: none;
+}
+
+.game-image img[src*="placeholder.com"] + .placeholder-image,
+.game-image img[src=""] + .placeholder-image,
+.game-image img:not([src]) + .placeholder-image {
+  display: block;
+}
+
+.placeholder-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    45deg,
+    var(--primary-color),
+    var(--secondary-color)
+  );
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--light-color);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 10px;
 }
 
 .game-card:hover .game-image img {
@@ -242,6 +282,9 @@ nav ul li {
   width: 16px;
   height: 16px;
   margin-right: 5px;
+  background-color: #1da1f2;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .game-votes {

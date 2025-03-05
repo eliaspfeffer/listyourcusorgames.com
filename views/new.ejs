@@ -1,15 +1,15 @@
 <div class="form-container">
-  <h2>Füge dein KI-generiertes Spiel hinzu</h2>
-  <p>Teile dein Spiel mit der Community - keine Anmeldung erforderlich!</p>
+  <h2>Add your AI-generated game</h2>
+  <p>Share your game with the community - no registration required!</p>
 
   <form action="/games" method="POST" class="game-form">
     <div class="form-group">
-      <label for="title">Spieltitel *</label>
+      <label for="title">Game Title *</label>
       <input type="text" id="title" name="title" required />
     </div>
 
     <div class="form-group">
-      <label for="description">Beschreibung *</label>
+      <label for="description">Description *</label>
       <textarea
         id="description"
         name="description"
@@ -17,32 +17,31 @@
         required
       ></textarea>
       <small
-        >Beschreibe kurz, worum es in deinem Spiel geht (max. 200
-        Zeichen)</small
+        >Briefly describe what your game is about (max. 200 characters)</small
       >
     </div>
 
     <div class="form-group">
-      <label for="gameUrl">Spiel-URL *</label>
+      <label for="gameUrl">Game URL *</label>
       <input type="url" id="gameUrl" name="gameUrl" required />
-      <small>Link zur Webseite, auf der dein Spiel gespielt werden kann</small>
+      <small>Link to the website where your game can be played</small>
     </div>
 
     <div class="form-group">
-      <label for="imageUrl">Bild-URL *</label>
+      <label for="imageUrl">Image URL *</label>
       <input type="url" id="imageUrl" name="imageUrl" required />
-      <small>Link zu einem Screenshot oder Vorschaubild deines Spiels</small>
+      <small>Link to a screenshot or preview image of your game</small>
     </div>
 
     <div class="form-group">
-      <label for="xProfile">X (Twitter) Profil</label>
+      <label for="xProfile">X (Twitter) Profile</label>
       <input type="text" id="xProfile" name="xProfile" />
-      <small>Dein X-Profil (optional, z.B. @username)</small>
+      <small>Your X profile (optional, e.g. @username)</small>
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary">Spiel hinzufügen</button>
-      <a href="/" class="btn btn-secondary">Abbrechen</a>
+      <button type="submit" class="btn btn-primary">Add Game</button>
+      <a href="/" class="btn btn-secondary">Cancel</a>
     </div>
   </form>
 </div>
