@@ -153,8 +153,22 @@
 </style>
 
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const socket = io();
+  document.addEventListener("DOMContentLoaded", async () => {
+    // Initialisiere Socket.IO
+    let socket;
+
+    // Prüfe, ob wir auf Vercel oder lokal sind
+    const isVercel = window.location.hostname.includes("vercel.app");
+
+    if (isVercel) {
+      // Auf Vercel: Initialisiere Socket.IO über die API-Route
+      await fetch("/api/socketio");
+      socket = io();
+    } else {
+      // Lokal: Direkte Verbindung
+      socket = io();
+    }
+
     const chatForm = document.getElementById("chat-form");
     const chatInput = document.getElementById("chat-input");
     const chatMessages = document.getElementById("chat-messages");

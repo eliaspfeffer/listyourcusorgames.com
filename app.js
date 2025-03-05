@@ -30,7 +30,6 @@ function normalizeUrl(url) {
 // Initialize Express!! :)
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
 
@@ -93,35 +92,40 @@ try {
   console.error("Error loading Game model:", err);
 }
 
-// Chat-Nachrichten im Speicher
-const chatMessages = [];
-const MAX_MESSAGES = 50;
+// Socket.IO nur lokal initialisieren
+if (process.env.NODE_ENV !== "production") {
+  const io = socketIo(server);
 
-// Socket.IO Chat-Handling
-io.on("connection", (socket) => {
-  // Sende bisherige Nachrichten an neue Verbindungen
-  socket.emit("previous messages", chatMessages);
+  // Chat-Nachrichten im Speicher
+  const chatMessages = [];
+  const MAX_MESSAGES = 50;
 
-  socket.on("set username", (username) => {
-    socket.username = username;
+  // Socket.IO Chat-Handling
+  io.on("connection", (socket) => {
+    // Sende bisherige Nachrichten an neue Verbindungen
+    socket.emit("previous messages", chatMessages);
+
+    socket.on("set username", (username) => {
+      socket.username = username;
+    });
+
+    socket.on("chat message", (msg) => {
+      const message = {
+        username: socket.username || "Anonym",
+        text: msg,
+        timestamp: new Date(),
+      };
+
+      chatMessages.push(message);
+      // Behalte nur die letzten MAX_MESSAGES Nachrichten
+      if (chatMessages.length > MAX_MESSAGES) {
+        chatMessages.shift();
+      }
+
+      io.emit("chat message", message);
+    });
   });
-
-  socket.on("chat message", (msg) => {
-    const message = {
-      username: socket.username || "Anonym",
-      text: msg,
-      timestamp: new Date(),
-    };
-
-    chatMessages.push(message);
-    // Behalte nur die letzten MAX_MESSAGES Nachrichten
-    if (chatMessages.length > MAX_MESSAGES) {
-      chatMessages.shift();
-    }
-
-    io.emit("chat message", message);
-  });
-});
+}
 
 // Routes
 app.get("/", async (req, res) => {
