@@ -48,19 +48,8 @@ app.set("views", path.join(__dirname, "views"));
 app.set("layout", "layout");
 
 // In-Memory Database in case MongoDB is not available
-let inMemoryGames = [
-  {
-    _id: "game1",
-    title: "Plane Battle Royale",
-    description:
-      "An exciting multiplayer airplane game where you battle against other players. Control your aircraft skillfully and shoot down your opponents!",
-    gameUrl: "https://fly.pieter.com",
-    xProfile: "@levelsio",
-    votes: 0,
-  },
-];
-
-let useInMemoryDB = true; // Use In-Memory DB by default
+let inMemoryGames = [];
+let useInMemoryDB = false; // Default auf false setzen
 
 // Try to connect to MongoDB
 mongoose
@@ -70,12 +59,12 @@ mongoose
     serverSelectionTimeoutMS: 5000,
   })
   .then(() => {
-    console.log("MongoDB connected successfully");
+    console.log("MongoDB erfolgreich verbunden");
     useInMemoryDB = false;
   })
   .catch((err) => {
-    console.error("MongoDB connection error:", err);
-    console.log("Using In-Memory database as fallback");
+    console.error("MongoDB Verbindungsfehler:", err);
+    console.log("Verwende In-Memory Datenbank als Fallback");
     useInMemoryDB = true;
   });
 
@@ -122,25 +111,14 @@ app.get("/", async (req, res) => {
   try {
     let games;
     if (useInMemoryDB) {
-      games = inMemoryGames.sort((a, b) => {
-        if (b.votes === a.votes) {
-          return b._id.localeCompare(a._id);
-        }
-        return b.votes - a.votes;
-      });
+      games = inMemoryGames.sort((a, b) => b.votes - a.votes);
     } else {
-      games = await Game.find().sort({ votes: -1, _id: -1 });
+      games = await Game.find().sort({ votes: -1, createdAt: -1 });
     }
     res.render("index", { games });
   } catch (err) {
-    console.error("Error loading games:", err);
-    const games = inMemoryGames.sort((a, b) => {
-      if (b.votes === a.votes) {
-        return b._id.localeCompare(a._id);
-      }
-      return b.votes - a.votes;
-    });
-    res.render("index", { games });
+    console.error("Fehler beim Laden der Spiele:", err);
+    res.render("index", { games: [] });
   }
 });
 
@@ -152,60 +130,59 @@ app.get("/games/new", (req, res) => {
 // Spielansicht Route
 app.get("/games/:id/play", async (req, res) => {
   try {
-    let game;
-    if (useInMemoryDB) {
-      game = inMemoryGames.find((g) => g._id === req.params.id);
-    } else {
-      game = await Game.findById(req.params.id);
-    }
+    const game = await Game.findById(req.params.id);
 
     if (!game) {
-      return res.status(404).send("Game not found");
+      console.log("Spiel nicht gefunden:", req.params.id);
+      return res.status(404).render("error", {
+        message: "Spiel nicht gefunden",
+        error: { status: 404 },
+      });
     }
 
     res.render("play", { game });
   } catch (err) {
-    console.error("Error loading game:", err);
-    res.status(500).send("Error loading game");
+    console.error("Fehler beim Laden des Spiels:", err);
+    res.status(500).render("error", {
+      message: "Fehler beim Laden des Spiels",
+      error: { status: 500 },
+    });
   }
 });
 
 // Add game - Process
 app.post("/games", async (req, res) => {
   try {
-    if (!process.env.MONGODB_URI) {
-      throw new Error("MONGODB_URI is not set in environment variables");
+    const { title, description, gameUrl, xProfile } = req.body;
+
+    // Validierung
+    if (!title || !description || !gameUrl) {
+      return res.status(400).json({
+        error: "Fehlende Pflichtfelder",
+        details: "Titel, Beschreibung und Game-URL sind erforderlich",
+      });
     }
 
-    if (useInMemoryDB) {
-      const newGame = {
-        _id: "game" + (inMemoryGames.length + 1),
-        title: req.body.title,
-        description: req.body.description,
-        gameUrl: normalizeUrl(req.body.gameUrl),
-        xProfile: req.body.xProfile || "",
-        votes: 0,
-      };
-      inMemoryGames.push(newGame);
-    } else {
-      const newGame = new Game({
-        title: req.body.title,
-        description: req.body.description,
-        gameUrl: normalizeUrl(req.body.gameUrl),
-        xProfile: req.body.xProfile || "",
-        votes: 0,
-      });
-      await newGame.save();
-    }
+    const newGame = new Game({
+      title: title.trim(),
+      description: description.trim(),
+      gameUrl: normalizeUrl(gameUrl),
+      xProfile: xProfile ? xProfile.trim() : "",
+      votes: 0,
+      createdAt: new Date(),
+    });
+
+    await newGame.save();
+    console.log("Neues Spiel erfolgreich gespeichert:", newGame.title);
     res.redirect("/");
   } catch (err) {
-    console.error("Error saving game:", err);
+    console.error("Fehler beim Speichern des Spiels:", err);
     res.status(500).json({
-      error: "Error saving game",
+      error: "Fehler beim Speichern",
       details:
         process.env.NODE_ENV === "development"
           ? err.message
-          : "Internal server error",
+          : "Interner Server-Fehler",
     });
   }
 });
@@ -213,36 +190,56 @@ app.post("/games", async (req, res) => {
 // Upvote game
 app.post("/games/:id/upvote", async (req, res) => {
   try {
-    if (useInMemoryDB) {
-      const game = inMemoryGames.find((g) => g._id === req.params.id);
-      if (game) {
-        game.votes += 1;
-      }
-    } else {
-      await Game.findByIdAndUpdate(req.params.id, { $inc: { votes: 1 } });
+    const game = await Game.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { votes: 1 } },
+      { new: true }
+    );
+
+    if (!game) {
+      return res.status(404).json({
+        error: "Spiel nicht gefunden",
+      });
     }
+
     res.redirect("/");
   } catch (err) {
-    console.error("Error upvoting:", err);
-    res.redirect("/");
+    console.error("Fehler beim Upvoten:", err);
+    res.status(500).json({
+      error: "Fehler beim Upvoten",
+      details:
+        process.env.NODE_ENV === "development"
+          ? err.message
+          : "Interner Server-Fehler",
+    });
   }
 });
 
 // Downvote game
 app.post("/games/:id/downvote", async (req, res) => {
   try {
-    if (useInMemoryDB) {
-      const game = inMemoryGames.find((g) => g._id === req.params.id);
-      if (game) {
-        game.votes -= 1;
-      }
-    } else {
-      await Game.findByIdAndUpdate(req.params.id, { $inc: { votes: -1 } });
+    const game = await Game.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { votes: -1 } },
+      { new: true }
+    );
+
+    if (!game) {
+      return res.status(404).json({
+        error: "Spiel nicht gefunden",
+      });
     }
+
     res.redirect("/");
   } catch (err) {
-    console.error("Error downvoting:", err);
-    res.redirect("/");
+    console.error("Fehler beim Downvoten:", err);
+    res.status(500).json({
+      error: "Fehler beim Downvoten",
+      details:
+        process.env.NODE_ENV === "development"
+          ? err.message
+          : "Interner Server-Fehler",
+    });
   }
 });
 
