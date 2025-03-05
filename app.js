@@ -5,9 +5,29 @@ const bodyParser = require("body-parser");
 const methodOverride = require("method-override");
 const path = require("path");
 const expressLayouts = require("express-ejs-layouts");
+const http = require("http");
+const socketIo = require("socket.io");
+
+// URL-Normalisierungsfunktion
+function normalizeUrl(url) {
+  if (!url) return url;
+
+  // Entferne führende und nachfolgende Leerzeichen
+  url = url.trim();
+
+  // Wenn keine Protokoll-Angabe vorhanden ist, füge https:// hinzu
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = "https://" + url;
+  }
+
+  return url;
+}
 
 // Initialize Express!! :)
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
 const PORT = process.env.PORT || 3000;
 
 // Middleware
@@ -89,20 +109,61 @@ try {
   console.error("Error loading Game model:", err);
 }
 
+// Chat-Nachrichten im Speicher
+const chatMessages = [];
+const MAX_MESSAGES = 50;
+
+// Socket.IO Chat-Handling
+io.on("connection", (socket) => {
+  // Sende bisherige Nachrichten an neue Verbindungen
+  socket.emit("previous messages", chatMessages);
+
+  socket.on("set username", (username) => {
+    socket.username = username;
+  });
+
+  socket.on("chat message", (msg) => {
+    const message = {
+      username: socket.username || "Anonym",
+      text: msg,
+      timestamp: new Date(),
+    };
+
+    chatMessages.push(message);
+    // Behalte nur die letzten MAX_MESSAGES Nachrichten
+    if (chatMessages.length > MAX_MESSAGES) {
+      chatMessages.shift();
+    }
+
+    io.emit("chat message", message);
+  });
+});
+
 // Routes
 app.get("/", async (req, res) => {
   try {
     let games;
     if (useInMemoryDB) {
-      games = inMemoryGames.sort((a, b) => b.votes - a.votes);
+      games = inMemoryGames.sort((a, b) => {
+        if (b.votes === a.votes) {
+          // Bei gleicher Stimmenzahl das neuere Spiel (höhere ID) zuerst
+          return b._id.localeCompare(a._id);
+        }
+        return b.votes - a.votes;
+      });
     } else {
-      games = await Game.find().sort({ votes: -1 });
+      games = await Game.find().sort({ votes: -1, _id: -1 });
     }
     res.render("index", { games });
   } catch (err) {
     console.error("Error loading games:", err);
     // Fallback to In-Memory DB on error
-    const games = inMemoryGames.sort((a, b) => b.votes - a.votes);
+    const games = inMemoryGames.sort((a, b) => {
+      if (b.votes === a.votes) {
+        return b._id.localeCompare(a._id);
+      }
+      return b.votes - a.votes;
+    });
     res.render("index", { games });
   }
 });
@@ -120,8 +181,8 @@ app.post("/games", async (req, res) => {
         _id: "game" + (inMemoryGames.length + 1),
         title: req.body.title,
         description: req.body.description,
-        gameUrl: req.body.gameUrl,
-        imageUrl: req.body.imageUrl,
+        gameUrl: normalizeUrl(req.body.gameUrl),
+        imageUrl: normalizeUrl(req.body.imageUrl),
         xProfile: req.body.xProfile || "",
         votes: 0,
       };
@@ -130,8 +191,8 @@ app.post("/games", async (req, res) => {
       const newGame = new Game({
         title: req.body.title,
         description: req.body.description,
-        gameUrl: req.body.gameUrl,
-        imageUrl: req.body.imageUrl,
+        gameUrl: normalizeUrl(req.body.gameUrl),
+        imageUrl: normalizeUrl(req.body.imageUrl),
         xProfile: req.body.xProfile || "",
         votes: 0,
       });
@@ -180,8 +241,8 @@ app.post("/games/:id/downvote", async (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
+// Start server (ändern Sie app.listen zu server.listen)
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Website available at http://localhost:${PORT}`);
 });
