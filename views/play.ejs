@@ -190,6 +190,25 @@
       const fullscreenToggle = document.getElementById("fullscreen-toggle");
       const gameContainer = document.querySelector(".game-container");
 
+      chatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const msg = chatInput.value.trim();
+        if (msg) {
+          socket.emit("chat message", { gameId, msg });
+          chatInput.value = "";
+        }
+        return false;
+      });
+
+      chatInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      });
+
       fullscreenToggle.addEventListener("click", () => {
         gameContainer.classList.toggle("fullscreen");
         fullscreenToggle.textContent = gameContainer.classList.contains(
@@ -212,15 +231,6 @@
         usernameInput.value = savedUsername;
         socket.emit("set username", savedUsername);
       }
-
-      chatForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const msg = chatInput.value.trim();
-        if (msg) {
-          socket.emit("chat message", { gameId, msg });
-          chatInput.value = "";
-        }
-      });
 
       socket.on("chat message", (msg) => {
         const div = document.createElement("div");
