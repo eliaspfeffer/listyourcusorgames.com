@@ -157,6 +157,9 @@
     // Initialisiere Socket.IO
     let socket;
 
+    // Hole die Spiel-ID aus der URL
+    const gameId = window.location.pathname.split("/")[2];
+
     // Prüfe, ob wir auf Vercel oder lokal sind
     const isVercel = window.location.hostname.includes("vercel.app");
 
@@ -168,6 +171,9 @@
       // Lokal: Direkte Verbindung
       socket = io();
     }
+
+    // Trete dem Spiel-Raum bei
+    socket.emit("join game", gameId);
 
     const chatForm = document.getElementById("chat-form");
     const chatInput = document.getElementById("chat-input");
@@ -191,15 +197,24 @@
       const username = usernameInput.value.trim();
       if (username) {
         socket.emit("set username", username);
+        // Speichere Username im localStorage
+        localStorage.setItem("chatUsername", username);
       }
     });
+
+    // Lade gespeicherten Username
+    const savedUsername = localStorage.getItem("chatUsername");
+    if (savedUsername) {
+      usernameInput.value = savedUsername;
+      socket.emit("set username", savedUsername);
+    }
 
     // Chat-Nachricht senden
     chatForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const msg = chatInput.value.trim();
       if (msg) {
-        socket.emit("chat message", msg);
+        socket.emit("chat message", { gameId, msg });
         chatInput.value = "";
       }
     });
