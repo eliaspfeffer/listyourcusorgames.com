@@ -1,7 +1,16 @@
 <div class="game-container">
   <div class="game-header">
     <h2><%= game.title %></h2>
-    <button id="fullscreen-toggle" class="btn">Fullscreen</button>
+    <div class="header-buttons">
+      <a
+        href="<%= game.gameUrl %>"
+        target="_blank"
+        class="external-link-button"
+      >
+        Buggy or not working? Open externally!
+      </a>
+      <button id="fullscreen-toggle" class="btn">Fullscreen</button>
+    </div>
   </div>
 
   <div class="game-wrapper">
@@ -56,6 +65,12 @@
     margin-bottom: 20px;
   }
 
+  .header-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
   .game-wrapper {
     display: flex;
     gap: 20px;
@@ -68,6 +83,8 @@
     background: #000;
     border: 2px solid #00ff00;
     border-radius: 5px;
+    display: flex;
+    flex-direction: column;
   }
 
   #game-frame {
@@ -131,6 +148,18 @@
   }
 
   /* Vollbildmodus Styles */
+  .fullscreen .game-header {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px;
+    border-radius: 5px;
+    border: 2px solid #00ff00;
+  }
+
   .fullscreen #game-frame-container {
     position: fixed;
     top: 0;
@@ -190,6 +219,25 @@
     color: #ff0000;
     font-style: italic;
     font-size: 8px;
+  }
+
+  .external-link-button {
+    background: rgba(0, 0, 0, 0.8);
+    color: #00ff00;
+    text-decoration: none;
+    padding: 8px 15px;
+    text-align: center;
+    font-family: "Press Start 2P", cursive;
+    font-size: 10px;
+    border: 2px solid #00ff00;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+  }
+
+  .external-link-button:hover {
+    background: rgba(0, 255, 0, 0.2);
+    transform: translateY(-2px);
   }
 </style>
 
