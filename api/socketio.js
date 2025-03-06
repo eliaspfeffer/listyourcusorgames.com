@@ -10,6 +10,11 @@ const ChatMessage =
   mongoose.model("ChatMessage", require("../models/Chat"));
 
 const ioHandler = async (req, res) => {
+  console.log("Socket.IO API Handler aufgerufen");
+
+  // Verzögerung hinzufügen, um die Verarbeitung zu verbessern
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
   if (!res.socket.server.io) {
     console.log("Socket.IO-Initialisierung...");
 
@@ -27,43 +32,48 @@ const ioHandler = async (req, res) => {
     // Ensure MongoDB connection
     try {
       if (mongoose.connection.readyState !== 1) {
-        console.log("Connecting to MongoDB...");
+        console.log("Verbindung zu MongoDB wird hergestellt...");
         await mongoose.connect(process.env.MONGODB_URI, {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
           dbName: "test",
         });
-        console.log("MongoDB connected successfully!");
+        console.log("MongoDB erfolgreich verbunden!");
+        console.log("Datenbank:", mongoose.connection.db.databaseName);
+      } else {
+        console.log("MongoDB bereits verbunden");
       }
     } catch (err) {
-      console.error("MongoDB connection error:", err);
-      return res.status(500).json({ error: "Database connection failed" });
+      console.error("MongoDB Verbindungsfehler:", err);
+      return res
+        .status(500)
+        .json({ error: "Datenbankverbindung fehlgeschlagen" });
     }
 
     io.on("connection", (socket) => {
-      console.log("New socket connection:", socket.id);
+      console.log("Neue Socket-Verbindung:", socket.id);
       let currentUsername = "Anonym";
 
       socket.on("join game", async (gameId) => {
         if (!gameId) {
-          console.error("No gameId provided for join event");
+          console.error("Keine gameId für Join-Event angegeben");
           return;
         }
 
         try {
           socket.join(gameId);
-          console.log(`Socket ${socket.id} joined game: ${gameId}`);
+          console.log(`Socket ${socket.id} ist Spiel beigetreten: ${gameId}`);
 
           const messages = await ChatMessage.find({ gameId })
             .sort({ timestamp: -1 })
             .limit(50)
             .lean();
 
-          console.log(`Found ${messages.length} messages for game ${gameId}`);
+          console.log(
+            `${messages.length} Nachrichten für Spiel ${gameId} gefunden`
+          );
           socket.emit("previous messages", messages.reverse());
         } catch (err) {
-          console.error("Error loading messages:", err);
-          socket.emit("error", "Failed to load messages");
+          console.error("Fehler beim Laden der Nachrichten:", err);
+          socket.emit("error", "Nachrichten konnten nicht geladen werden");
         }
       });
 
@@ -71,20 +81,20 @@ const ioHandler = async (req, res) => {
         if (typeof username === "string" && username.trim()) {
           currentUsername = username.trim();
           console.log(
-            `Username set for socket ${socket.id}: ${currentUsername}`
+            `Benutzername für Socket ${socket.id} gesetzt: ${currentUsername}`
           );
         }
       });
 
       socket.on("chat message", async ({ gameId, msg }) => {
-        console.log("Received chat message:", {
+        console.log("Chat-Nachricht erhalten:", {
           gameId,
           msg,
           username: currentUsername,
         });
 
         if (!gameId || !msg || typeof msg !== "string") {
-          console.error("Invalid message data received");
+          console.error("Ungültige Nachrichtendaten erhalten");
           return;
         }
 
@@ -96,9 +106,12 @@ const ioHandler = async (req, res) => {
             timestamp: new Date(),
           });
 
-          console.log("Attempting to save message:", message);
+          console.log("Speichere Nachricht...");
           const savedMessage = await message.save();
-          console.log("Message saved successfully:", savedMessage);
+          console.log(
+            "Nachricht erfolgreich gespeichert:",
+            JSON.stringify(savedMessage)
+          );
 
           io.to(gameId).emit("chat message", {
             username: savedMessage.username,
@@ -106,20 +119,25 @@ const ioHandler = async (req, res) => {
             timestamp: savedMessage.timestamp,
           });
         } catch (err) {
-          console.error("Error saving message:", err);
-          socket.emit("error", "Failed to send message");
+          console.error("Fehler beim Speichern der Nachricht:", err);
+          socket.emit("error", "Nachricht konnte nicht gesendet werden");
         }
       });
 
       socket.on("disconnect", () => {
-        console.log(`Socket disconnected: ${socket.id}`);
+        console.log(`Socket getrennt: ${socket.id}`);
       });
     });
 
     res.socket.server.io = io;
+    console.log(
+      "Socket.IO-Server initialisiert und an res.socket.server.io zugewiesen"
+    );
+  } else {
+    console.log("Socket.IO-Server bereits initialisiert");
   }
 
-  res.end();
+  res.status(200).json({ success: true });
 };
 
 export const config = {

@@ -26,7 +26,7 @@
         />
       </div>
       <div id="chat-messages"></div>
-      <form id="chat-form">
+      <form id="chat-form" onsubmit="return false;">
         <div class="chat-input-container">
           <input
             type="text"
@@ -186,19 +186,31 @@
     const gameId = window.location.pathname.split("/")[2];
     const isVercel = window.location.hostname.includes("vercel.app");
 
+    console.log("Chat initialisiert für Spiel:", gameId);
+    console.log("Umgebung:", isVercel ? "Vercel" : "Lokal");
+
     try {
       if (isVercel) {
         // Für Vercel-Deployment
-        await fetch("/api/socketio");
+        console.log("Initialisiere Socket.IO für Vercel...");
+        try {
+          const response = await fetch("/api/socketio");
+          console.log("API-Antwort:", await response.text());
+        } catch (error) {
+          console.error("API-Aufruf fehlgeschlagen:", error);
+        }
+
         socket = io({
           path: "/api/socketio",
           addTrailingSlash: false,
           transports: ["websocket", "polling"],
           reconnectionAttempts: 5,
           reconnectionDelay: 1000,
+          timeout: 20000,
         });
       } else {
         // Für lokale Entwicklung
+        console.log("Initialisiere Socket.IO lokal...");
         socket = io({
           transports: ["websocket", "polling"],
         });
@@ -249,8 +261,18 @@
         }
       };
 
-      // Form submit handler
+      // Form submit handler - stark verbessert
       chatForm.addEventListener("submit", (e) => {
+        console.log("Form-Submission erkannt");
+        e.preventDefault();
+        e.stopPropagation();
+        sendMessage();
+        return false;
+      });
+
+      // Expliziter Send-Button-Handler hinzufügen
+      document.querySelector(".send-button").addEventListener("click", (e) => {
+        console.log("Send-Button geklickt");
         e.preventDefault();
         e.stopPropagation();
         sendMessage();
