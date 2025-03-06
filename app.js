@@ -34,17 +34,42 @@ function normalizeUrl(url) {
 const app = express();
 const server = http.createServer(app);
 
+// CORS-Middleware - Wichtig für Vercel und Socket.IO
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept"
+  );
+
+  // Preflight-Anfragen direkt beantworten
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  next();
+});
+
 // Socket.IO Konfiguration
 const io = socketIo(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
   },
   path: process.env.VERCEL === "1" ? "/api/socketio" : undefined,
   transports: ["polling", "websocket"],
   pingTimeout: 60000,
   pingInterval: 25000,
+  connectTimeout: 45000,
+  allowEIO3: true,
+});
+
+// Debug-Middleware für Socket.IO
+io.use((socket, next) => {
+  console.log(`Socket Verbindungsversuch: ${socket.id}`);
+  next();
 });
 
 // Socket.IO Chat Handling
@@ -53,6 +78,19 @@ io.on("connection", (socket) => {
     `[${new Date().toISOString()}] Neue Socket-Verbindung: ${socket.id}`
   );
   let currentUsername = "Anonym";
+
+  // Ping-Pong zur Verbindungsprüfung
+  const pingInterval = setInterval(() => {
+    if (socket.connected) {
+      socket.emit("ping");
+    } else {
+      clearInterval(pingInterval);
+    }
+  }, 25000);
+
+  socket.on("ping", () => {
+    socket.emit("pong");
+  });
 
   socket.on("join game", async (gameId) => {
     if (!gameId) {
@@ -63,6 +101,13 @@ io.on("connection", (socket) => {
     try {
       socket.join(gameId);
       console.log(`Socket ${socket.id} ist Spiel beigetreten: ${gameId}`);
+
+      // Prüfen, ob die Verbindung zur Datenbank besteht
+      if (mongoose.connection.readyState !== 1) {
+        console.error("MongoDB nicht verbunden beim Laden der Nachrichten");
+        socket.emit("error", "Datenbankverbindung nicht verfügbar");
+        return;
+      }
 
       const messages = await ChatMessage.find({ gameId })
         .sort({ timestamp: -1 })
@@ -175,12 +220,31 @@ io.on("connection", (socket) => {
 
 // API Route für Socket.IO Health Check
 app.get("/api/socketio", (req, res) => {
-  res.json({
-    status: "success",
-    message: "Socket.IO server is running",
-    timestamp: new Date().toISOString(),
-    env: process.env.VERCEL === "1" ? "vercel" : "local",
-  });
+  // CORS-Header für Vercel
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  try {
+    // Stellen Sie sicher, dass die DB-Verbindung besteht
+    const dbStatus =
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+
+    res.json({
+      status: "success",
+      message: "Socket.IO server is running",
+      timestamp: new Date().toISOString(),
+      env: process.env.VERCEL === "1" ? "vercel" : "local",
+      socket_initialized: !!io,
+      db_status: dbStatus,
+    });
+  } catch (err) {
+    console.error("Health Check Error:", err);
+    res.status(500).json({
+      status: "error",
+      message: err.message,
+    });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
