@@ -19,11 +19,10 @@ const ioHandler = async (req, res) => {
       cors: {
         origin: "*",
         methods: ["GET", "POST"],
+        credentials: true,
       },
       transports: ["websocket", "polling"],
     });
-
-    res.socket.server.io = io;
 
     // Ensure MongoDB connection
     try {
@@ -35,29 +34,16 @@ const ioHandler = async (req, res) => {
           dbName: "test",
         });
         console.log("MongoDB connected successfully!");
-        console.log("Database name:", mongoose.connection.name);
-        console.log(
-          "Collections:",
-          await mongoose.connection.db.listCollections().toArray()
-        );
-      } else {
-        console.log("MongoDB already connected");
-        console.log("Database name:", mongoose.connection.name);
-        console.log(
-          "Collections:",
-          await mongoose.connection.db.listCollections().toArray()
-        );
       }
     } catch (err) {
       console.error("MongoDB connection error:", err);
-      return res.status(500).end();
+      return res.status(500).json({ error: "Database connection failed" });
     }
 
     io.on("connection", (socket) => {
       console.log("New socket connection:", socket.id);
       let currentUsername = "Anonym";
 
-      // Handle joining a game room
       socket.on("join game", async (gameId) => {
         if (!gameId) {
           console.error("No gameId provided for join event");
@@ -65,12 +51,9 @@ const ioHandler = async (req, res) => {
         }
 
         try {
-          // Join the room
           socket.join(gameId);
           console.log(`Socket ${socket.id} joined game: ${gameId}`);
 
-          // Load previous messages
-          console.log(`Loading messages for game: ${gameId}`);
           const messages = await ChatMessage.find({ gameId })
             .sort({ timestamp: -1 })
             .limit(50)
@@ -84,7 +67,6 @@ const ioHandler = async (req, res) => {
         }
       });
 
-      // Handle username updates
       socket.on("set username", (username) => {
         if (typeof username === "string" && username.trim()) {
           currentUsername = username.trim();
@@ -94,7 +76,6 @@ const ioHandler = async (req, res) => {
         }
       });
 
-      // Handle new chat messages
       socket.on("chat message", async ({ gameId, msg }) => {
         console.log("Received chat message:", {
           gameId,
@@ -108,7 +89,6 @@ const ioHandler = async (req, res) => {
         }
 
         try {
-          // Create the message document
           const message = new ChatMessage({
             username: currentUsername,
             text: msg.trim(),
@@ -117,19 +97,9 @@ const ioHandler = async (req, res) => {
           });
 
           console.log("Attempting to save message:", message);
-
-          // Save to database
           const savedMessage = await message.save();
-          console.log("Message saved successfully!");
-          console.log("Saved message details:", {
-            id: savedMessage._id,
-            username: savedMessage.username,
-            text: savedMessage.text,
-            gameId: savedMessage.gameId,
-            timestamp: savedMessage.timestamp,
-          });
+          console.log("Message saved successfully:", savedMessage);
 
-          // Broadcast to room
           io.to(gameId).emit("chat message", {
             username: savedMessage.username,
             text: savedMessage.text,
@@ -137,11 +107,6 @@ const ioHandler = async (req, res) => {
           });
         } catch (err) {
           console.error("Error saving message:", err);
-          console.error("Error details:", {
-            name: err.name,
-            message: err.message,
-            stack: err.stack,
-          });
           socket.emit("error", "Failed to send message");
         }
       });
@@ -150,9 +115,17 @@ const ioHandler = async (req, res) => {
         console.log(`Socket disconnected: ${socket.id}`);
       });
     });
+
+    res.socket.server.io = io;
   }
 
   res.end();
+};
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
 };
 
 export default ioHandler;

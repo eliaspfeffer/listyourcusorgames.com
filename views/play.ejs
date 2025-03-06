@@ -187,16 +187,18 @@
     const isVercel = window.location.hostname.includes("vercel.app");
 
     try {
-      // Initialize Socket.IO
       if (isVercel) {
-        // For Vercel deployment
+        // Für Vercel-Deployment
         await fetch("/api/socketio");
         socket = io({
           path: "/api/socketio",
           addTrailingSlash: false,
+          transports: ["websocket", "polling"],
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
         });
       } else {
-        // For local development
+        // Für lokale Entwicklung
         socket = io({
           transports: ["websocket", "polling"],
         });
@@ -204,16 +206,29 @@
 
       // Debug logging
       socket.on("connect", () => {
-        console.log("Socket connected:", socket.id);
+        console.log("Socket verbunden:", socket.id);
         socket.emit("join game", gameId);
       });
 
       socket.on("connect_error", (error) => {
-        console.error("Socket connection error:", error);
+        console.error("Socket Verbindungsfehler:", error);
       });
 
       socket.on("error", (error) => {
-        console.error("Socket error:", error);
+        console.error("Socket Fehler:", error);
+      });
+
+      socket.on("reconnect", (attemptNumber) => {
+        console.log("Socket wiederverbunden nach Versuch:", attemptNumber);
+        socket.emit("join game", gameId);
+      });
+
+      socket.on("reconnect_error", (error) => {
+        console.error("Socket Wiederverbindungsfehler:", error);
+      });
+
+      socket.on("reconnect_failed", () => {
+        console.error("Socket Wiederverbindung fehlgeschlagen");
       });
 
       const chatForm = document.getElementById("chat-form");
@@ -323,7 +338,7 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
       });
     } catch (error) {
-      console.error("Socket.IO initialization error:", error);
+      console.error("Socket.IO Initialisierungsfehler:", error);
     }
   });
 </script>
