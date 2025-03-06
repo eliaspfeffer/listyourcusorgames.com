@@ -195,22 +195,18 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", async () => {
-    let socket;
-    let socketConnected = false;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
     const gameId = window.location.pathname.split("/")[2];
     const isVercel = window.location.hostname.includes("vercel.app");
+    const chatMessages = document.getElementById("chat-messages");
+    const chatForm = document.getElementById("chat-form");
+    const chatInput = document.getElementById("chat-input");
+    const usernameInput = document.getElementById("username-input");
+    const fullscreenToggle = document.getElementById("fullscreen-toggle");
+    const gameContainer = document.querySelector(".game-container");
 
-    console.log("Chat initialisiert für Spiel:", gameId);
-    console.log("Umgebung:", isVercel ? "Vercel" : "Lokal");
-
-    // Status-Element für Verbindungsinformationen
-    const addStatusMessage = (message, isError = false) => {
+    // Statusmeldung anzeigen
+    function addStatusMessage(message, isError = false) {
       try {
-        const chatMessages = document.getElementById("chat-messages");
-        if (!chatMessages) return;
-
         const statusEl = document.createElement("div");
         statusEl.className = `message ${isError ? "error" : "system"}`;
         statusEl.textContent = message;
@@ -219,306 +215,295 @@
       } catch (err) {
         console.error("Fehler beim Anzeigen der Statusmeldung:", err);
       }
+    }
+
+    // Temp-Statusnachricht anzeigen (verschwindet nach timeout)
+    function showTempStatus(message, isError = false, timeout = 5000) {
+      const statusEl = document.createElement("div");
+      statusEl.className = `message ${isError ? "error" : "system"}`;
+      statusEl.textContent = message;
+      chatMessages.appendChild(statusEl);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      setTimeout(() => {
+        try {
+          statusEl.remove();
+        } catch (e) {}
+      }, timeout);
+    }
+
+    // Message zur Anzeige hinzufügen
+    function addMessageToChat(msg) {
+      if (!msg || !msg.text) return;
+
+      const div = document.createElement("div");
+      div.className = "message";
+      const time = new Date(msg.timestamp).toLocaleTimeString();
+      div.innerHTML = `
+        <span class="timestamp">[${time}]</span>
+        <span class="username">${msg.username || "Anonym"}:</span>
+        ${msg.text}
+      `;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Chat-System initialisieren
+    const initChat = () => {
+      console.log("Initialisiere Chat für Spiel:", gameId);
+      console.log("Umgebung:", isVercel ? "Vercel" : "Lokal");
+
+      // Lade bestehende Nachrichten
+      loadMessages();
+
+      // Polling für neue Nachrichten starten, wenn wir auf Vercel sind
+      if (isVercel) {
+        addStatusMessage("Chat-System gestartet (HTTP-Polling Modus)");
+        startMessagePolling();
+      } else {
+        // Für lokale Entwicklung verwenden wir weiterhin Socket.IO
+        initSocketIO();
+      }
     };
 
-    // Rekursive Funktion zum Aufbauen der Socket-Verbindung
-    const connectSocket = async (attempt = 0) => {
+    // Nachrichten über Standard-HTTP-Fetch laden
+    async function loadMessages() {
       try {
-        if (attempt > 0) {
-          addStatusMessage(`Verbindungsversuch ${attempt}...`);
+        addStatusMessage("Lade vorherige Nachrichten...");
+        const response = await fetch(`/api/messages/${gameId}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP Fehler ${response.status}`);
         }
 
-        // Health Check für Socket.IO-Endpunkt
+        const messages = await response.json();
+        console.log("Vorherige Nachrichten geladen:", messages.length);
+
+        chatMessages.innerHTML = "";
+
+        if (messages.length === 0) {
+          addStatusMessage("Keine vorherigen Nachrichten");
+          return;
+        }
+
+        messages.forEach((msg) => addMessageToChat(msg));
+        addStatusMessage("Nachrichten geladen");
+      } catch (error) {
+        console.error("Fehler beim Laden der Nachrichten:", error);
+        addStatusMessage("Fehler beim Laden der Nachrichten", true);
+      }
+    }
+
+    // Regelmäßiges Polling für neue Nachrichten (nur für Vercel)
+    let lastMessageTimestamp = new Date().toISOString();
+    let pollingInterval;
+
+    function startMessagePolling() {
+      // Alle 5 Sekunden nach neuen Nachrichten fragen
+      pollingInterval = setInterval(async () => {
         try {
-          const response = await fetch("/api/socketio");
-          const data = await response.json();
-          console.log("Socket.IO Health Check:", data);
+          const response = await fetch(
+            `/api/messages/${gameId}/new?since=${encodeURIComponent(
+              lastMessageTimestamp
+            )}`
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP Fehler ${response.status}`);
+          }
+
+          const newMessages = await response.json();
+
+          if (newMessages.length > 0) {
+            console.log("Neue Nachrichten erhalten:", newMessages.length);
+            newMessages.forEach((msg) => addMessageToChat(msg));
+
+            // Aktualisiere Zeitstempel für die nächste Abfrage
+            if (newMessages.length > 0) {
+              lastMessageTimestamp = new Date().toISOString();
+            }
+          }
         } catch (error) {
-          console.error("Socket.IO-Endpunkt nicht erreichbar:", error);
+          console.error("Fehler beim Polling:", error);
+        }
+      }, 5000);
+    }
+
+    // Nachricht senden (HTTP POST)
+    async function sendMessageHttp(text) {
+      if (!text.trim()) return;
+
+      showTempStatus("Sende Nachricht...");
+
+      try {
+        const username = usernameInput.value.trim() || "Anonym";
+
+        const response = await fetch(`/api/messages/${gameId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: text.trim(),
+            username: username,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP Fehler ${response.status}`);
         }
 
-        const socketOptions = {
-          transports: ["polling", "websocket"],
-          reconnectionAttempts: 3,
-          reconnectionDelay: 1000,
-          timeout: 10000,
-          forceNew: true,
-          autoConnect: true,
-        };
+        const result = await response.json();
 
-        // Vercel-spezifische Konfiguration
-        if (isVercel) {
-          socketOptions.path = "/api/socketio";
+        if (result.success) {
+          showTempStatus("Nachricht gesendet!");
+          // Nach dem Senden sofort neue Nachrichten laden
+          await loadMessages();
+        } else {
+          showTempStatus(
+            "Fehler: " + (result.error || "Unbekannter Fehler"),
+            true
+          );
         }
+      } catch (error) {
+        console.error("Fehler beim Senden der Nachricht:", error);
+        showTempStatus("Fehler beim Senden", true);
+      }
+    }
 
-        // Verbindung herstellen
-        socket = io(socketOptions);
+    // Socket.IO für lokale Entwicklung
+    let socket;
 
-        // Event-Listener für Verbindungsereignisse
+    async function initSocketIO() {
+      try {
+        addStatusMessage("Verbindung wird hergestellt (Socket.IO)...");
+
+        socket = io({
+          transports: ["websocket", "polling"],
+        });
+
         socket.on("connect", () => {
           console.log("Socket verbunden:", socket.id);
-          socketConnected = true;
           addStatusMessage("Verbindung hergestellt");
-
-          // Spiel-Raum beitreten
           socket.emit("join game", gameId);
-        });
-
-        // Ping-Pong zur Verbindungsprüfung
-        socket.on("ping", () => {
-          console.log("Ping erhalten, sende Pong");
-          if (socket.connected) socket.emit("pong");
-        });
-
-        socket.on("pong", () => {
-          console.log("Pong erhalten - Verbindung aktiv");
         });
 
         socket.on("connect_error", (error) => {
           console.error("Socket Verbindungsfehler:", error);
-          socketConnected = false;
+          addStatusMessage(`Verbindungsfehler: ${error.message}`, true);
+        });
 
-          if (attempt < maxReconnectAttempts) {
-            // Automatischer Wiederverbindungsversuch
-            setTimeout(() => connectSocket(attempt + 1), 2000);
-          } else {
-            addStatusMessage(
-              `Verbindungsfehler: ${
-                error.message || "Serververbindung fehlgeschlagen"
-              }`,
-              true
-            );
+        socket.on("previous messages", (messages) => {
+          console.log("Nachrichten geladen:", messages?.length || 0);
+
+          chatMessages.innerHTML = "";
+
+          if (!Array.isArray(messages) || messages.length === 0) {
+            addStatusMessage("Keine vorherigen Nachrichten");
+            return;
           }
+
+          messages.forEach((msg) => addMessageToChat(msg));
+        });
+
+        socket.on("chat message", (msg) => {
+          console.log("Neue Nachricht erhalten:", msg);
+          addMessageToChat(msg);
         });
 
         socket.on("error", (error) => {
           console.error("Socket Fehler:", error);
-          addStatusMessage(`Socket Fehler: ${error}`, true);
+          addStatusMessage(`Fehler: ${error}`, true);
         });
 
-        socket.on("disconnect", (reason) => {
-          console.log("Socket getrennt, Grund:", reason);
-          socketConnected = false;
-          addStatusMessage(`Verbindung getrennt: ${reason}`);
-
-          // Automatische Wiederverbindung bei bestimmten Gründen
-          if (
-            reason === "io server disconnect" ||
-            reason === "transport close"
-          ) {
-            if (reconnectAttempts < maxReconnectAttempts) {
-              reconnectAttempts++;
-              addStatusMessage(
-                `Wiederverbindungsversuch ${reconnectAttempts}...`
-              );
-              setTimeout(() => socket.connect(), 2000);
-            }
-          }
+        socket.on("disconnect", () => {
+          console.log("Socket getrennt");
+          addStatusMessage("Verbindung getrennt", true);
         });
-
-        // Event-Listener für Chat-Nachrichten
-        setupChatHandlers(socket);
-        return socket;
       } catch (error) {
         console.error("Socket.IO Initialisierungsfehler:", error);
         addStatusMessage(`Initialisierungsfehler: ${error.message}`, true);
-        return null;
       }
-    };
+    }
 
-    // Chat-Handler einrichten
-    const setupChatHandlers = (socket) => {
-      const chatForm = document.getElementById("chat-form");
-      const chatInput = document.getElementById("chat-input");
-      const chatMessages = document.getElementById("chat-messages");
-      const usernameInput = document.getElementById("username-input");
-      const fullscreenToggle = document.getElementById("fullscreen-toggle");
-      const gameContainer = document.querySelector(".game-container");
+    // Nachrichtenversand-Funktion
+    const sendMessage = () => {
+      const text = chatInput.value.trim();
+      if (!text) return;
 
-      // Sendestatus Anzeige
-      const showSendStatus = (message, isError = false) => {
-        const statusEl = document.createElement("div");
-        statusEl.className = `message ${isError ? "error" : "system"}`;
-        statusEl.textContent = message;
-        chatMessages.appendChild(statusEl);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+      console.log("Sende Nachricht:", text);
 
-        // Automatisch entfernen nach 5 Sekunden
-        setTimeout(() => {
-          try {
-            statusEl.remove();
-          } catch (e) {}
-        }, 5000);
-      };
-
-      // Send message function
-      const sendMessage = () => {
-        const msg = chatInput.value.trim();
-        if (!msg) return;
-
-        if (!socket || !socketConnected) {
-          showSendStatus(
-            "Nicht verbunden! Nachricht kann nicht gesendet werden.",
-            true
-          );
-          return;
-        }
-
-        console.log("Sende Nachricht:", { gameId, msg });
-        showSendStatus("Sende...");
-
-        // Timeout für Nachrichtenzustellung
-        const messageTimeout = setTimeout(() => {
-          showSendStatus("Timeout beim Senden", true);
-        }, 5000);
-
-        socket.emit("chat message", { gameId, msg }, (ack) => {
-          clearTimeout(messageTimeout);
-
+      if (isVercel) {
+        // HTTP-basierte Nachrichtenübermittlung für Vercel
+        sendMessageHttp(text);
+      } else if (socket && socket.connected) {
+        // Socket.IO für lokale Entwicklung
+        socket.emit("chat message", { gameId, msg: text }, (ack) => {
           if (ack && ack.success) {
-            showSendStatus("Gesendet!");
+            showTempStatus("Gesendet!");
           } else if (ack && ack.error) {
-            showSendStatus(`Fehler: ${ack.error}`, true);
-          } else {
-            // Keine Antwort erhalten
-            showSendStatus("Keine Bestätigung erhalten", true);
+            showTempStatus(`Fehler: ${ack.error}`, true);
           }
         });
-
-        chatInput.value = "";
-        chatInput.focus();
-      };
-
-      // Form submit handler
-      chatForm.addEventListener("submit", (e) => {
-        console.log("Form-Submission erkannt");
-        e.preventDefault();
-        e.stopPropagation();
-        sendMessage();
-        return false;
-      });
-
-      // Send button handler
-      document.querySelector(".send-button").addEventListener("click", (e) => {
-        console.log("Send-Button geklickt");
-        e.preventDefault();
-        e.stopPropagation();
-        sendMessage();
-        return false;
-      });
-
-      // Enter key handler
-      chatInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          sendMessage();
-        }
-      });
-
-      // Username handling
-      const setUsername = (username) => {
-        if (!username || !username.trim()) return;
-
-        console.log("Setting username:", username.trim());
-        if (socket && socketConnected) {
-          socket.emit("set username", username.trim());
-        }
-        localStorage.setItem("chatUsername", username.trim());
-      };
-
-      usernameInput.addEventListener("change", () => {
-        setUsername(usernameInput.value);
-      });
-
-      usernameInput.addEventListener("blur", () => {
-        setUsername(usernameInput.value);
-      });
-
-      // Load saved username
-      const savedUsername = localStorage.getItem("chatUsername");
-      if (savedUsername) {
-        usernameInput.value = savedUsername;
-        if (socket && socketConnected) {
-          setUsername(savedUsername);
-        }
+      } else {
+        showTempStatus("Nicht verbunden!", true);
       }
 
-      // Fullscreen toggle
-      fullscreenToggle.addEventListener("click", () => {
-        gameContainer.classList.toggle("fullscreen");
-        fullscreenToggle.textContent = gameContainer.classList.contains(
-          "fullscreen"
-        )
-          ? "Normal size"
-          : "Fullscreen";
-      });
-
-      // Handle incoming messages
-      socket.on("chat message", (msg) => {
-        console.log("Nachricht erhalten:", msg);
-        try {
-          if (!msg || !msg.text) {
-            console.error("Ungültige Nachricht erhalten:", msg);
-            return;
-          }
-
-          const div = document.createElement("div");
-          div.className = "message";
-          const time = new Date(msg.timestamp).toLocaleTimeString();
-          div.innerHTML = `
-            <span class="timestamp">[${time}]</span>
-            <span class="username">${msg.username || "Anonym"}:</span>
-            ${msg.text}
-          `;
-          chatMessages.appendChild(div);
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        } catch (error) {
-          console.error("Fehler beim Anzeigen der Nachricht:", error);
-        }
-      });
-
-      // Handle previous messages
-      socket.on("previous messages", (messages) => {
-        console.log("Vorherige Nachrichten geladen:", messages?.length || 0);
-        try {
-          if (!Array.isArray(messages)) {
-            console.error("Ungültiges Nachrichtenformat erhalten:", messages);
-            return;
-          }
-
-          chatMessages.innerHTML = "";
-
-          if (messages.length === 0) {
-            const div = document.createElement("div");
-            div.className = "message system";
-            div.textContent = "Keine vorherigen Nachrichten";
-            chatMessages.appendChild(div);
-            return;
-          }
-
-          messages.forEach((msg) => {
-            if (!msg || !msg.text) return;
-
-            const div = document.createElement("div");
-            div.className = "message";
-            const time = new Date(msg.timestamp).toLocaleTimeString();
-            div.innerHTML = `
-              <span class="timestamp">[${time}]</span>
-              <span class="username">${msg.username || "Anonym"}:</span>
-              ${msg.text}
-            `;
-            chatMessages.appendChild(div);
-          });
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        } catch (error) {
-          console.error("Fehler beim Anzeigen vorheriger Nachrichten:", error);
-        }
-      });
+      chatInput.value = "";
+      chatInput.focus();
     };
 
-    // Initial Socket verbinden
-    addStatusMessage("Verbindung wird hergestellt...");
-    await connectSocket();
+    // Event-Listener für die Chat-Formulare
+    chatForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sendMessage();
+      return false;
+    });
+
+    document.querySelector(".send-button").addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sendMessage();
+      return false;
+    });
+
+    chatInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        sendMessage();
+      }
+    });
+
+    // Username-Handling
+    const savedUsername = localStorage.getItem("chatUsername");
+    if (savedUsername) {
+      usernameInput.value = savedUsername;
+    }
+
+    usernameInput.addEventListener("change", () => {
+      const username = usernameInput.value.trim();
+      if (username) {
+        localStorage.setItem("chatUsername", username);
+
+        if (!isVercel && socket && socket.connected) {
+          socket.emit("set username", username);
+        }
+      }
+    });
+
+    // Fullscreen-Toggle
+    fullscreenToggle.addEventListener("click", () => {
+      gameContainer.classList.toggle("fullscreen");
+      fullscreenToggle.textContent = gameContainer.classList.contains(
+        "fullscreen"
+      )
+        ? "Normal size"
+        : "Fullscreen";
+    });
+
+    // Chat initialisieren
+    initChat();
   });
 </script>

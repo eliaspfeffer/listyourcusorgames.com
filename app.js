@@ -51,200 +51,250 @@ app.use((req, res, next) => {
   next();
 });
 
-// Socket.IO Konfiguration
-const io = socketIo(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST", "OPTIONS"],
-    credentials: true,
-  },
-  path: process.env.VERCEL === "1" ? "/api/socketio" : undefined,
-  transports: ["polling", "websocket"],
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  connectTimeout: 45000,
-  allowEIO3: true,
-});
+// EJS Setup
+app.set("view engine", "ejs");
+app.use(express.static("public"));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
-// Debug-Middleware für Socket.IO
-io.use((socket, next) => {
-  console.log(`Socket Verbindungsversuch: ${socket.id}`);
-  next();
-});
+// HTTP REST-API für Chat-Nachrichten
+// Nachrichtenliste für eine bestimmte GameID abrufen
+app.get("/api/messages/:gameId", async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
 
-// Socket.IO Chat Handling
-io.on("connection", (socket) => {
-  console.log(
-    `[${new Date().toISOString()}] Neue Socket-Verbindung: ${socket.id}`
-  );
-  let currentUsername = "Anonym";
-
-  // Ping-Pong zur Verbindungsprüfung
-  const pingInterval = setInterval(() => {
-    if (socket.connected) {
-      socket.emit("ping");
-    } else {
-      clearInterval(pingInterval);
-    }
-  }, 25000);
-
-  socket.on("ping", () => {
-    socket.emit("pong");
-  });
-
-  socket.on("join game", async (gameId) => {
     if (!gameId) {
-      console.error("Keine gameId für Join-Event angegeben");
-      return;
+      return res.status(400).json({ error: "Spiel-ID fehlt" });
     }
 
-    try {
-      socket.join(gameId);
-      console.log(`Socket ${socket.id} ist Spiel beigetreten: ${gameId}`);
+    const messages = await ChatMessage.find({ gameId })
+      .sort({ timestamp: -1 })
+      .limit(50)
+      .lean();
 
-      // Prüfen, ob die Verbindung zur Datenbank besteht
-      if (mongoose.connection.readyState !== 1) {
-        console.error("MongoDB nicht verbunden beim Laden der Nachrichten");
-        socket.emit("error", "Datenbankverbindung nicht verfügbar");
-        return;
-      }
+    res.json(messages.reverse());
+  } catch (error) {
+    console.error("Fehler beim Abrufen der Nachrichten:", error);
+    res
+      .status(500)
+      .json({ error: "Serverfehler beim Abrufen der Nachrichten" });
+  }
+});
 
-      const messages = await ChatMessage.find({ gameId })
-        .sort({ timestamp: -1 })
-        .limit(50)
-        .lean();
+// Neue Nachrichten seit einem bestimmten Zeitpunkt abrufen
+app.get("/api/messages/:gameId/new", async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
+    const since = req.query.since || new Date(0).toISOString();
 
-      console.log(
-        `${messages.length} Nachrichten für Spiel ${gameId} gefunden`
-      );
-
-      if (socket.connected) {
-        socket.emit("previous messages", messages.reverse());
-      }
-    } catch (err) {
-      console.error("Fehler beim Laden der Nachrichten:", err);
-      if (socket.connected) {
-        socket.emit("error", "Nachrichten konnten nicht geladen werden");
-      }
+    if (!gameId) {
+      return res.status(400).json({ error: "Spiel-ID fehlt" });
     }
-  });
 
-  socket.on("set username", (username) => {
-    if (typeof username === "string" && username.trim()) {
-      currentUsername = username.trim();
-      console.log(
-        `Benutzername für Socket ${socket.id} gesetzt: ${currentUsername}`
-      );
-    }
-  });
+    const messages = await ChatMessage.find({
+      gameId: gameId,
+      timestamp: { $gt: new Date(since) },
+    })
+      .sort({ timestamp: 1 })
+      .lean();
 
-  socket.on("chat message", async (data, callback) => {
-    try {
-      const { gameId, msg } = data;
+    res.json(messages);
+  } catch (error) {
+    console.error("Fehler beim Abrufen neuer Nachrichten:", error);
+    res
+      .status(500)
+      .json({ error: "Serverfehler beim Abrufen neuer Nachrichten" });
+  }
+});
 
-      console.log("Chat-Nachricht erhalten:", {
-        gameId,
-        msg,
-        username: currentUsername,
+// Neue Nachricht senden
+app.post("/api/messages/:gameId", async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
+    const { text, username } = req.body;
+
+    if (!gameId || !text) {
+      return res.status(400).json({
+        success: false,
+        error: "Spiel-ID und Nachrichtentext sind erforderlich",
       });
+    }
 
-      if (!gameId || !msg || typeof msg !== "string") {
-        console.error("Ungültige Nachrichtendaten erhalten");
-        if (typeof callback === "function") {
-          callback({ error: "Ungültige Nachrichtendaten" });
-        }
+    const message = new ChatMessage({
+      gameId: gameId,
+      username: username || "Anonym",
+      text: text.trim(),
+      timestamp: new Date(),
+    });
+
+    await message.save();
+
+    console.log("Nachricht gespeichert:", {
+      gameId,
+      username: message.username,
+      text: message.text,
+    });
+
+    // Bei Socket.IO die Nachricht an alle Verbundenen senden
+    // Falls Socket.IO aktiv ist (lokale Umgebung)
+    if (io) {
+      io.to(gameId).emit("chat message", {
+        username: message.username,
+        text: message.text,
+        timestamp: message.timestamp,
+      });
+    }
+
+    res.json({
+      success: true,
+      messageId: message._id.toString(),
+    });
+  } catch (error) {
+    console.error("Fehler beim Speichern der Nachricht:", error);
+    res.status(500).json({
+      success: false,
+      error: "Serverfehler beim Speichern der Nachricht",
+    });
+  }
+});
+
+// Socket.IO Konfiguration (nur für lokale Entwicklung)
+const isVercel = process.env.VERCEL === "1";
+let io;
+
+if (!isVercel) {
+  io = socketIo(server, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST", "OPTIONS"],
+      credentials: true,
+    },
+    transports: ["websocket", "polling"],
+    pingTimeout: 60000,
+    pingInterval: 25000,
+  });
+
+  console.log("Socket.IO für lokale Entwicklung initialisiert");
+
+  // Socket.IO Chat Handling
+  io.on("connection", (socket) => {
+    console.log(
+      `[${new Date().toISOString()}] Neue Socket-Verbindung: ${socket.id}`
+    );
+    let currentUsername = "Anonym";
+
+    socket.on("join game", async (gameId) => {
+      if (!gameId) {
+        console.error("Keine gameId für Join-Event angegeben");
         return;
       }
 
       try {
-        if (mongoose.connection.readyState !== 1) {
-          console.error("MongoDB nicht verbunden beim Speichern der Nachricht");
+        socket.join(gameId);
+        console.log(`Socket ${socket.id} ist Spiel beigetreten: ${gameId}`);
+
+        const messages = await ChatMessage.find({ gameId })
+          .sort({ timestamp: -1 })
+          .limit(50)
+          .lean();
+
+        console.log(
+          `${messages.length} Nachrichten für Spiel ${gameId} gefunden`
+        );
+
+        if (socket.connected) {
+          socket.emit("previous messages", messages.reverse());
+        }
+      } catch (err) {
+        console.error("Fehler beim Laden der Nachrichten:", err);
+        if (socket.connected) {
+          socket.emit("error", "Nachrichten konnten nicht geladen werden");
+        }
+      }
+    });
+
+    socket.on("set username", (username) => {
+      if (typeof username === "string" && username.trim()) {
+        currentUsername = username.trim();
+        console.log(
+          `Benutzername für Socket ${socket.id} gesetzt: ${currentUsername}`
+        );
+      }
+    });
+
+    socket.on("chat message", async (data, callback) => {
+      try {
+        const { gameId, msg } = data;
+
+        if (!gameId || !msg || typeof msg !== "string") {
+          console.error("Ungültige Nachrichtendaten erhalten");
           if (typeof callback === "function") {
-            callback({ error: "Datenbankverbindung nicht verfügbar" });
+            callback({ success: false, error: "Ungültige Nachrichtendaten" });
           }
           return;
         }
 
-        const message = new ChatMessage({
-          username: currentUsername,
-          text: msg.trim(),
-          gameId: gameId,
-          timestamp: new Date(),
-        });
+        try {
+          const message = new ChatMessage({
+            username: currentUsername,
+            text: msg.trim(),
+            gameId: gameId,
+            timestamp: new Date(),
+          });
 
-        console.log("Speichere Nachricht...");
-        const savedMessage = await message.save();
-        console.log(
-          "Nachricht erfolgreich gespeichert:",
-          JSON.stringify({
+          console.log("Speichere Nachricht...");
+          const savedMessage = await message.save();
+          console.log("Nachricht gespeichert:", {
             id: savedMessage._id.toString(),
             username: savedMessage.username,
             text: savedMessage.text,
-            gameId: savedMessage.gameId,
+          });
+
+          io.to(gameId).emit("chat message", {
+            username: savedMessage.username,
+            text: savedMessage.text,
             timestamp: savedMessage.timestamp,
-          })
-        );
+          });
 
-        io.to(gameId).emit("chat message", {
-          username: savedMessage.username,
-          text: savedMessage.text,
-          timestamp: savedMessage.timestamp,
-        });
-
-        if (typeof callback === "function") {
-          callback({ success: true, messageId: savedMessage._id.toString() });
+          if (typeof callback === "function") {
+            callback({ success: true, messageId: savedMessage._id.toString() });
+          }
+        } catch (err) {
+          console.error("Fehler beim Speichern der Nachricht:", err);
+          if (typeof callback === "function") {
+            callback({
+              success: false,
+              error: "Nachricht konnte nicht gespeichert werden",
+            });
+          } else if (socket.connected) {
+            socket.emit("error", "Nachricht konnte nicht gesendet werden");
+          }
         }
       } catch (err) {
-        console.error("Fehler beim Speichern der Nachricht:", err);
+        console.error("Fehler bei der Nachrichtenverarbeitung:", err);
         if (typeof callback === "function") {
-          callback({ error: "Nachricht konnte nicht gespeichert werden" });
-        } else if (socket.connected) {
-          socket.emit("error", "Nachricht konnte nicht gesendet werden");
+          callback({ success: false, error: "Interner Serverfehler" });
         }
       }
-    } catch (err) {
-      console.error(
-        "Unerwarteter Fehler bei der Nachrichtenverarbeitung:",
-        err
-      );
-      if (typeof callback === "function") {
-        callback({ error: "Interner Serverfehler" });
-      }
-    }
-  });
+    });
 
-  socket.on("disconnect", () => {
-    console.log(`Socket getrennt: ${socket.id}`);
+    socket.on("disconnect", () => {
+      console.log(`Socket getrennt: ${socket.id}`);
+    });
   });
-});
+} else {
+  console.log("Vercel-Umgebung erkannt, nur HTTP-API für Chat wird verwendet");
+}
 
-// API Route für Socket.IO Health Check
+// API für Socket.IO Health Check (hauptsächlich für Debug)
 app.get("/api/socketio", (req, res) => {
-  // CORS-Header für Vercel
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  try {
-    // Stellen Sie sicher, dass die DB-Verbindung besteht
-    const dbStatus =
-      mongoose.connection.readyState === 1 ? "connected" : "disconnected";
-
-    res.json({
-      status: "success",
-      message: "Socket.IO server is running",
-      timestamp: new Date().toISOString(),
-      env: process.env.VERCEL === "1" ? "vercel" : "local",
-      socket_initialized: !!io,
-      db_status: dbStatus,
-    });
-  } catch (err) {
-    console.error("Health Check Error:", err);
-    res.status(500).json({
-      status: "error",
-      message: err.message,
-    });
-  }
+  res.json({
+    status: "success",
+    message: "API endpoint active",
+    timestamp: new Date().toISOString(),
+    env: isVercel ? "vercel" : "local",
+    socketio_enabled: !isVercel,
+  });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -257,7 +307,6 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // View Engine
 app.use(expressLayouts);
-app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.set("layout", "layout");
 
