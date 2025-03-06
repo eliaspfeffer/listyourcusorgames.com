@@ -9,14 +9,14 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/socketio",
-      "dest": "app.js"
+      "source": "/api/socketio",
+      "destination": "app.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "app.js"
+      "source": "/(.*)",
+      "destination": "app.js"
     }
   ],
   "headers": [
