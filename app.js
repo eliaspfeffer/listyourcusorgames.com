@@ -48,7 +48,7 @@ if (!isVercel) {
 
   const ChatMessage = require("./models/Chat");
 
-  // Socket.IO Chat Handling für lokale Umgebung
+  // Socket.IO Chat Handling für lokale Umgebung.
   io.on("connection", (socket) => {
     console.log("Neue Socket-Verbindung:", socket.id);
     let currentUsername = "Anonym";
