@@ -7,6 +7,7 @@ const path = require("path");
 const expressLayouts = require("express-ejs-layouts");
 const http = require("http");
 const socketIo = require("socket.io");
+const ChatMessage = require("./models/Chat");
 
 // URL-Normalisierungsfunktion
 function normalizeUrl(url) {
@@ -32,6 +33,12 @@ function normalizeUrl(url) {
 // Initialize Express!! :)
 const app = express();
 const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
 
 const PORT = process.env.PORT || 3000;
 
@@ -57,6 +64,7 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000,
+    dbName: "test",
   })
   .then(() => {
     console.log("MongoDB erfolgreich verbunden");
@@ -71,40 +79,91 @@ mongoose
 // Models
 const Game = require("./models/Game");
 
-// Socket.IO nur lokal initialisieren
-if (process.env.NODE_ENV !== "production") {
-  const io = socketIo(server);
+// Socket.IO Chat Handling
+io.on("connection", (socket) => {
+  console.log("New socket connection:", socket.id);
+  let currentUsername = "Anonym";
 
-  // Chat-Nachrichten im Speicher
-  const chatMessages = [];
-  const MAX_MESSAGES = 50;
+  socket.on("join game", async (gameId) => {
+    if (!gameId) {
+      console.error("No gameId provided for join event");
+      return;
+    }
 
-  // Socket.IO Chat-Handling
-  io.on("connection", (socket) => {
-    // Sende bisherige Nachrichten an neue Verbindungen
-    socket.emit("previous messages", chatMessages);
+    try {
+      socket.join(gameId);
+      console.log(`Socket ${socket.id} joined game: ${gameId}`);
 
-    socket.on("set username", (username) => {
-      socket.username = username;
-    });
+      const messages = await ChatMessage.find({ gameId })
+        .sort({ timestamp: -1 })
+        .limit(50)
+        .lean();
 
-    socket.on("chat message", (msg) => {
-      const message = {
-        username: socket.username || "Anonym",
-        text: msg,
-        timestamp: new Date(),
-      };
-
-      chatMessages.push(message);
-      // Behalte nur die letzten MAX_MESSAGES Nachrichten
-      if (chatMessages.length > MAX_MESSAGES) {
-        chatMessages.shift();
-      }
-
-      io.emit("chat message", message);
-    });
+      console.log(`Found ${messages.length} messages for game ${gameId}`);
+      socket.emit("previous messages", messages.reverse());
+    } catch (err) {
+      console.error("Error loading messages:", err);
+      socket.emit("error", "Failed to load messages");
+    }
   });
-}
+
+  socket.on("set username", (username) => {
+    if (typeof username === "string" && username.trim()) {
+      currentUsername = username.trim();
+      console.log(`Username set for socket ${socket.id}: ${currentUsername}`);
+    }
+  });
+
+  socket.on("chat message", async ({ gameId, msg }) => {
+    console.log("Received chat message:", {
+      gameId,
+      msg,
+      username: currentUsername,
+    });
+
+    if (!gameId || !msg || typeof msg !== "string") {
+      console.error("Invalid message data received");
+      return;
+    }
+
+    try {
+      const message = new ChatMessage({
+        username: currentUsername,
+        text: msg.trim(),
+        gameId: gameId,
+        timestamp: new Date(),
+      });
+
+      console.log("Attempting to save message:", message);
+
+      const savedMessage = await message.save();
+      console.log("Message saved successfully!");
+      console.log("Saved message details:", {
+        id: savedMessage._id,
+        username: savedMessage.username,
+        text: savedMessage.text,
+        gameId: savedMessage.gameId,
+      });
+
+      io.to(gameId).emit("chat message", {
+        username: savedMessage.username,
+        text: savedMessage.text,
+        timestamp: savedMessage.timestamp,
+      });
+    } catch (err) {
+      console.error("Error saving message:", err);
+      console.error("Error details:", {
+        name: err.name,
+        message: err.message,
+      });
+      socket.emit("error", "Failed to send message");
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`Socket disconnected: ${socket.id}`);
+  });
+});
 
 // Routes
 app.get("/", async (req, res) => {

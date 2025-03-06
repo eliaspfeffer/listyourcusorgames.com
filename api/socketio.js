@@ -4,30 +4,10 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Chat Message Schema
-const chatMessageSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    default: "Anonym",
-  },
-  text: {
-    type: String,
-    required: true,
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now,
-  },
-  gameId: {
-    type: String,
-    required: true,
-  },
-});
-
-// Erstelle das Modell nur, wenn es noch nicht existiert
+// Import the Chat model
 const ChatMessage =
   mongoose.models.ChatMessage ||
-  mongoose.model("ChatMessage", chatMessageSchema);
+  mongoose.model("ChatMessage", require("../models/Chat"));
 
 const ioHandler = async (req, res) => {
   if (!res.socket.server.io) {
@@ -40,90 +20,138 @@ const ioHandler = async (req, res) => {
         origin: "*",
         methods: ["GET", "POST"],
       },
+      transports: ["websocket", "polling"],
     });
 
     res.socket.server.io = io;
 
-    // Verbinde mit MongoDB, wenn noch nicht verbunden
-    if (mongoose.connection.readyState !== 1) {
-      try {
+    // Ensure MongoDB connection
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        console.log("Connecting to MongoDB...");
         await mongoose.connect(process.env.MONGODB_URI, {
           useNewUrlParser: true,
           useUnifiedTopology: true,
+          dbName: "test",
         });
-        console.log("MongoDB connected in socket handler");
-      } catch (err) {
-        console.error("MongoDB connection error in socket handler:", err);
+        console.log("MongoDB connected successfully!");
+        console.log("Database name:", mongoose.connection.name);
+        console.log(
+          "Collections:",
+          await mongoose.connection.db.listCollections().toArray()
+        );
+      } else {
+        console.log("MongoDB already connected");
+        console.log("Database name:", mongoose.connection.name);
+        console.log(
+          "Collections:",
+          await mongoose.connection.db.listCollections().toArray()
+        );
       }
+    } catch (err) {
+      console.error("MongoDB connection error:", err);
+      return res.status(500).end();
     }
 
     io.on("connection", (socket) => {
-      console.log("Neue Socket-Verbindung:", socket.id);
+      console.log("New socket connection:", socket.id);
+      let currentUsername = "Anonym";
 
-      // Raum betreten wenn ein Spiel geöffnet wird
+      // Handle joining a game room
       socket.on("join game", async (gameId) => {
         if (!gameId) {
-          console.error("Keine gameId beim Join-Event");
+          console.error("No gameId provided for join event");
           return;
         }
 
-        socket.join(gameId);
-        console.log(`Socket ${socket.id} ist Spiel beigetreten: ${gameId}`);
-
-        // Lade vorherige Nachrichten für dieses Spiel
         try {
+          // Join the room
+          socket.join(gameId);
+          console.log(`Socket ${socket.id} joined game: ${gameId}`);
+
+          // Load previous messages
+          console.log(`Loading messages for game: ${gameId}`);
           const messages = await ChatMessage.find({ gameId })
             .sort({ timestamp: -1 })
             .limit(50)
             .lean();
+
+          console.log(`Found ${messages.length} messages for game ${gameId}`);
           socket.emit("previous messages", messages.reverse());
         } catch (err) {
-          console.error("Fehler beim Laden der Nachrichten:", err);
-          socket.emit("error", "Fehler beim Laden der Nachrichten");
+          console.error("Error loading messages:", err);
+          socket.emit("error", "Failed to load messages");
         }
       });
 
+      // Handle username updates
       socket.on("set username", (username) => {
         if (typeof username === "string" && username.trim()) {
-          socket.username = username.trim();
-          console.log(`Username gesetzt für Socket ${socket.id}: ${username}`);
+          currentUsername = username.trim();
+          console.log(
+            `Username set for socket ${socket.id}: ${currentUsername}`
+          );
         }
       });
 
+      // Handle new chat messages
       socket.on("chat message", async ({ gameId, msg }) => {
+        console.log("Received chat message:", {
+          gameId,
+          msg,
+          username: currentUsername,
+        });
+
         if (!gameId || !msg || typeof msg !== "string") {
-          console.error("Ungültige Nachricht oder gameId");
+          console.error("Invalid message data received");
           return;
         }
 
         try {
+          // Create the message document
           const message = new ChatMessage({
-            username: socket.username || "Anonym",
+            username: currentUsername,
             text: msg.trim(),
             gameId: gameId,
             timestamp: new Date(),
           });
 
-          await message.save();
-          console.log(`Nachricht gespeichert für Spiel ${gameId}`);
+          console.log("Attempting to save message:", message);
 
-          // Sende die Nachricht nur an Clients im gleichen Spiel-Raum
+          // Save to database
+          const savedMessage = await message.save();
+          console.log("Message saved successfully!");
+          console.log("Saved message details:", {
+            id: savedMessage._id,
+            username: savedMessage.username,
+            text: savedMessage.text,
+            gameId: savedMessage.gameId,
+            timestamp: savedMessage.timestamp,
+          });
+
+          // Broadcast to room
           io.to(gameId).emit("chat message", {
-            username: message.username,
-            text: message.text,
-            timestamp: message.timestamp,
+            username: savedMessage.username,
+            text: savedMessage.text,
+            timestamp: savedMessage.timestamp,
           });
         } catch (err) {
-          console.error("Fehler beim Speichern der Nachricht:", err);
-          socket.emit("error", "Fehler beim Senden der Nachricht");
+          console.error("Error saving message:", err);
+          console.error("Error details:", {
+            name: err.name,
+            message: err.message,
+            stack: err.stack,
+          });
+          socket.emit("error", "Failed to send message");
         }
       });
 
       socket.on("disconnect", () => {
-        console.log(`Socket getrennt: ${socket.id}`);
+        console.log(`Socket disconnected: ${socket.id}`);
       });
     });
   }
+
   res.end();
 };
 
